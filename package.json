@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run barangay\" \"npm run connecta\"",
+    "server": "cd backend && node server.js",
+    "barangay": "cd Barangay && npm run dev",
+    "connecta": "cd ConnecTa && npm run dev"
+  },
+  "dependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
