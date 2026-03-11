@@ -80,57 +80,72 @@ function Report() {
 
   /* ---------------- SUBMIT REPORT ---------------- */
 
-  const handleReport = async () => {
+const handleReport = async () => {
 
-    if (!category || !location || !description || mediaFiles.length === 0) {
-      alert("Please fill all fields and attach proof.");
-      return;
-    }
+  if (!category || !location || !description || mediaFiles.length === 0) {
+    alert("Please fill all fields and attach proof.");
+    return;
+  }
 
-    try {
+  try {
 
-      setLoading(true);
+    setLoading(true);
 
-      const uid = localStorage.getItem("uid");
+    const uid = localStorage.getItem("uid");
 
-      const imageUrl = await uploadToCloudinary(mediaFiles[0]);
+    // upload all media
+    const uploadedMedia = [];
 
-      const response = await fetch("http://localhost:5000/report", {
+    for (const file of mediaFiles) {
 
-        method: "POST",
+      const url = await uploadToCloudinary(file);
 
-        headers: {
-          "Content-Type": "application/json"
-        },
-
-        body: JSON.stringify({
-          category,
-          location,
-          description,
-          proofofReport: imageUrl,
-          uid
-        })
-
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-
-        setCategory("");
-        setLocation("");
-        setDescription("");
-        setMediaFiles([]);
-
-        setSubmitted(true);
+      if (url) {
+        uploadedMedia.push(url);
       }
 
-    } catch (error) {
-      console.error(error);
     }
 
-    setLoading(false);
-  };
+    const response = await fetch("http://localhost:5000/report", {
+
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+        category,
+        location,
+        description,
+        proofofReport: uploadedMedia,   // now array
+        uid
+      })
+
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+
+      setCategory("");
+      setLocation("");
+      setDescription("");
+      setMediaFiles([]);
+
+      setSubmitted(true);
+
+    }
+
+  } catch (error) {
+
+    console.error(error);
+
+  }
+
+  setLoading(false);
+
+};
 
   /* ---------------- CLOSE SUCCESS MODAL ---------------- */
 
