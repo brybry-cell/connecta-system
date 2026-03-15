@@ -440,6 +440,130 @@ app.put("/admin/resolve-report/:id", async (req, res) => {
 
 });
 
+/* CREATE NEWS POST */
+app.post("/admin/news", async (req, res) => {
+
+const {
+title,
+category,
+description,
+media,
+status,
+schedule,
+adminUID
+} = req.body;
+
+try{
+
+const adminDoc = await db.collection("residents").doc(adminUID).get();
+
+if(!adminDoc.exists){
+return res.status(404).json({message:"Admin not found"});
+}
+
+const adminData = adminDoc.data();
+
+const post = {
+title,
+category,
+description,
+media,
+status,
+schedule,
+adminUID,
+postedBy: adminData.firstname + " " + adminData.lastname,
+role: adminData.role,
+createdAt: new Date().toLocaleString()
+};
+
+const doc = await db.collection("news").add(post);
+
+res.json({
+message:"Post created",
+id:doc.id
+});
+
+}catch(err){
+res.status(500).json({error:err.message});
+}
+
+});
+
+app.get("/news", async (req,res)=>{
+
+try{
+
+const snapshot = await db.collection("news")
+.orderBy("createdAt","desc")
+.get();
+
+const posts = snapshot.docs.map(doc=>({
+id:doc.id,
+...doc.data()
+}));
+
+res.json(posts);
+
+}catch(err){
+res.status(500).json({error:err.message});
+}
+
+});
+
+app.get("/news", async (req,res)=>{
+
+try{
+
+const snapshot = await db.collection("news")
+.orderBy("createdAt","desc")
+.get();
+
+const posts = snapshot.docs.map(doc=>({
+id:doc.id,
+...doc.data()
+}));
+
+res.json(posts);
+
+}catch(err){
+res.status(500).json({error:err.message});
+}
+
+});
+
+app.put("/admin/news/:id", async (req,res)=>{
+
+const {id} = req.params;
+
+try{
+
+await db.collection("news").doc(id).update(req.body);
+
+res.json({message:"Post updated"});
+
+}catch(err){
+res.status(500).json({error:err.message});
+}
+
+});
+
+app.delete("/admin/news/:id", async (req,res)=>{
+
+const {id} = req.params;
+
+try{
+
+await db.collection("news").doc(id).delete();
+
+res.json({message:"Post deleted"});
+
+}catch(err){
+res.status(500).json({error:err.message});
+}
+
+});
+
+
 app.listen(5000, () => {
   console.log("Server running on port 5000");
 });

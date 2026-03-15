@@ -1,10 +1,11 @@
 import Header from "../components/Header";
 import SideNav from "../components/navi";
+import Modal from "../components/modal";
 import { useState, useEffect } from "react";
 import profileDefault from "../assets/profile.png";
 import { uploadToCloudinary } from "../utils/cloudinary";
 
-function Settings() {
+function Settings(){
 
 const uid = localStorage.getItem("uid");
 
@@ -22,7 +23,6 @@ profileImage:""
 });
 
 const [password,setPassword] = useState({
-current:"",
 newpass:"",
 confirm:""
 });
@@ -40,7 +40,7 @@ email:false
 
 useEffect(()=>{
 
-const fetchUser = async ()=>{
+const fetchUser = async()=>{
 
 const res = await fetch(`http://localhost:5000/resident/${uid}`);
 const data = await res.json();
@@ -59,10 +59,10 @@ fetchUser();
 
 const checkStrength=(value)=>{
 
-if(value.length < 6){
+if(value.length<6){
 setPasswordStrength("Weak");
 }
-else if(value.match(/[A-Z]/) && value.match(/[0-9]/)){
+else if(value.match(/[A-Z]/)&&value.match(/[0-9]/)){
 setPasswordStrength("Strong");
 }
 else{
@@ -73,23 +73,17 @@ setPasswordStrength("Medium");
 
 
 
-/* PROFILE IMAGE UPLOAD */
+/* PROFILE UPLOAD */
 
-const handleImageUpload = async (e) => {
+const handleImageUpload=async(e)=>{
 
-const file = e.target.files[0];
+const file=e.target.files[0];
+if(!file)return;
 
-if(!file) return;
+const url=await uploadToCloudinary(file);
 
-const imageUrl = await uploadToCloudinary(file);
-
-if(imageUrl){
-
-setUser({
-...user,
-profileImage:imageUrl
-});
-
+if(url){
+setUser({...user,profileImage:url});
 }
 
 };
@@ -98,15 +92,12 @@ profileImage:imageUrl
 
 /* UPDATE ACCOUNT */
 
-const updateAccount = async ()=>{
+const updateAccount=async()=>{
 
 await fetch(`http://localhost:5000/update-account/${uid}`,{
 
 method:"PUT",
-
-headers:{
-"Content-Type":"application/json"
-},
+headers:{"Content-Type":"application/json"},
 
 body:JSON.stringify({
 
@@ -132,20 +123,14 @@ alert("Account updated successfully");
 const updatePassword = async ()=>{
 
 if(password.newpass !== password.confirm){
-
 alert("Passwords do not match");
 return;
-
 }
 
 await fetch(`http://localhost:5000/update-password/${uid}`,{
 
 method:"PUT",
-
-headers:{
-"Content-Type":"application/json"
-},
-
+headers:{"Content-Type":"application/json"},
 body:JSON.stringify(password)
 
 });
@@ -158,7 +143,7 @@ alert("Password updated");
 
 /* DELETE ACCOUNT */
 
-const confirmDelete = async ()=>{
+const confirmDelete=async()=>{
 
 await fetch(`http://localhost:5000/delete-account/${uid}`,{
 method:"DELETE"
@@ -171,24 +156,17 @@ window.location.href="/login";
 
 
 
-/* UI COMPONENTS */
+/* SETTINGS ITEM */
 
-const SectionTitle=({title})=>(
-<h3 className="text-xs uppercase text-gray-500 tracking-wider mt-8 mb-2">
-{title}
-</h3>
-);
-
-
-const SettingItem=({label,action,danger})=>(
+const SettingItem=({label,onClick,danger})=>(
 
 <div
-onClick={action}
+onClick={onClick}
 className={`flex justify-between items-center px-5 py-4 rounded-xl cursor-pointer transition
-${danger ? "hover:bg-red-50" : "hover:bg-blue-50"}`}
+${danger?"hover:bg-red-50":"hover:bg-blue-50"}`}
 >
 
-<span className={`${danger ? "text-red-500":"text-gray-700"} font-medium text-sm`}>
+<span className={`${danger?"text-red-500":"text-gray-700"} font-medium text-sm`}>
 {label}
 </span>
 
@@ -199,107 +177,76 @@ ${danger ? "hover:bg-red-50" : "hover:bg-blue-50"}`}
 );
 
 
-/* MODAL */
-
-const Modal=({title,children})=>(
-
-<div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-
-<div className="bg-white w-full max-w-lg max-h-[90vh] rounded-2xl shadow-xl flex flex-col">
-
-<div className="flex justify-between items-center px-6 py-4 border-b">
-
-<h2 className="text-lg font-semibold text-gray-800">
-{title}
-</h2>
-
-<button
-onClick={()=>setModal(null)}
-className="text-gray-400 text-lg"
->
-✕
-</button>
-
-</div>
-
-<div className="overflow-y-auto px-6 py-4">
-
-{children}
-
-</div>
-
-</div>
-
-</div>
-
-);
-
-
 
 return(
+
 <>
 
 <Header/>
 <SideNav open={open} setOpen={setOpen}/>
 
-<div className="md:ml-[260px] bg-gray-50 min-h-screen px-6 py-8">
+<div className="md:ml-[260px] bg-gray-50 min-h-screen">
 
-{/* MOBILE HAMBURGER */}
-<div className="md:hidden mb-4">
+{/* ================= MOBILE VIEW ================= */}
+
+<div className="md:hidden px-6 py-6">
+
 <button
-onClick={() => setOpen(true)}
-className="text-2xl text-[#007CCF]"
+onClick={()=>setOpen(true)}
+className="text-2xl text-[#007CCF] mb-4"
 >
 ☰
 </button>
-</div>
 
-<div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+<h1 className="text-2xl font-bold text-[#007CCF] mb-2">
+Settings
+</h1>
 
+<p className="text-gray-500 text-sm mb-6">
+Manage your account preferences
+</p>
 
-<SectionTitle title="Account"/>
+<div className="bg-white rounded-2xl shadow-lg border p-6">
+
+<h3 className="text-xs uppercase text-gray-500 mb-2">Account</h3>
 
 <SettingItem
 label="Account Information"
-action={()=>setModal("account")}
+onClick={()=>setModal("account")}
 />
 
-
-<SectionTitle title="Notifications"/>
+<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">Notifications</h3>
 
 <SettingItem
 label="Notification Settings"
-action={()=>setModal("notifications")}
+onClick={()=>setModal("notifications")}
 />
 
-
-<SectionTitle title="Support"/>
+<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">Support</h3>
 
 <SettingItem
 label="Help & Support"
-action={()=>setModal("support")}
+onClick={()=>setModal("support")}
 />
 
-
-<SectionTitle title="Privacy"/>
+<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">Privacy</h3>
 
 <SettingItem
 label="Privacy & Security"
-action={()=>setModal("privacy")}
+onClick={()=>setModal("privacy")}
 />
 
 <SettingItem
 label="Delete Account"
 danger
-action={()=>setModal("delete")}
+onClick={()=>setModal("delete")}
 />
 
-
-<SectionTitle title="About"/>
+<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">About</h3>
 
 <SettingItem
 label="About Connecta"
-action={()=>setModal("about")}
+onClick={()=>setModal("about")}
 />
 
 </div>
@@ -308,18 +255,75 @@ action={()=>setModal("about")}
 
 
 
-{/* ACCOUNT MODAL */}
+{/* ================= DESKTOP VIEW ================= */}
+
+<div className="hidden md:block px-6 py-8">
+
+<h1 className="text-3xl font-bold text-gray-800 mb-6">
+Settings
+</h1>
+
+<div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg border p-6">
+
+<h3 className="text-xs uppercase text-gray-500 mb-2">Account</h3>
+
+<SettingItem label="Account Information" onClick={()=>setModal("account")} />
+
+<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">Notifications</h3>
+
+<SettingItem label="Notification Settings" onClick={()=>setModal("notifications")} />
+
+<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">Support</h3>
+
+<SettingItem label="Help & Support" onClick={()=>setModal("support")} />
+
+<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">Privacy</h3>
+
+<SettingItem label="Privacy & Security" onClick={()=>setModal("privacy")} />
+
+<SettingItem label="Delete Account" danger onClick={()=>setModal("delete")} />
+
+<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">About</h3>
+
+<SettingItem label="About Connecta" onClick={()=>setModal("about")} />
+
+</div>
+
+</div>
+
+</div>
+
+
+
+{/* ================= CENTRALIZED MODAL ================= */}
+
+{modal && (
+
+<Modal
+title={
+modal==="account"?"Account Information":
+modal==="notifications"?"Notification Settings":
+modal==="support"?"Help & Support":
+modal==="privacy"?"Privacy & Security":
+modal==="delete"?"Delete Account":
+modal==="about"?"About Connecta":
+"Settings"
+}
+onClose={()=>setModal(null)}
+>
+
+{/* ACCOUNT */}
 
 {modal==="account" && (
 
-<Modal title="Account Information">
+<div>
 
 <div className="flex items-center gap-4 mb-6">
 
 <label className="cursor-pointer">
 
 <img
-src={user.profileImage || profileDefault}
+src={user.profileImage||profileDefault}
 className="w-20 h-20 rounded-full object-cover border"
 />
 
@@ -345,8 +349,6 @@ Click profile image to change
 </div>
 
 </div>
-
-
 
 <div className="space-y-4">
 
@@ -405,9 +407,7 @@ Update Account
 
 <hr/>
 
-<h3 className="font-semibold">
-Change Password
-</h3>
+<h3 className="font-semibold">Change Password</h3>
 
 <input
 type="password"
@@ -441,17 +441,17 @@ Update Password
 
 </div>
 
-</Modal>
+</div>
 
 )}
 
 
 
-{/* DELETE ACCOUNT */}
+{/* DELETE */}
 
 {modal==="delete" && (
 
-<Modal title="Delete Account">
+<div>
 
 <p className="text-sm mb-6">
 Are you sure you want to delete your account?
@@ -475,12 +475,18 @@ Delete
 
 </div>
 
+</div>
+
+)}
+
 </Modal>
 
 )}
 
 </>
+
 );
+
 }
 
 export default Settings;
