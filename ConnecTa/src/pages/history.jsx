@@ -4,6 +4,8 @@ import ReportCard from "../components/ReportCard";
 import ReportModal from "../components/ReportModal";
 import Table from "../components/table";
 import { useState, useEffect } from "react";
+import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { db } from "../firebase";
 
 function History() {
 
@@ -17,30 +19,49 @@ function History() {
   const [currentPage, setCurrentPage] = useState(1);
   const reportsPerPage = 10;
 
+  
+const [selectedDate, setSelectedDate] = useState("");
+const [loading, setLoading] = useState(true);
+useEffect(() => {
+  const uid = localStorage.getItem("uid");
+  if (!uid) return;
 
-  useEffect(() => {
+  const q = query(
+    collection(db, "reports"),
+    where("reportedBy", "==", uid),
+    orderBy("createdAt", "desc")
+  );
 
-    const fetchReports = async () => {
+const unsubscribe = onSnapshot(q, async (snapshot) => {
 
-      const uid = localStorage.getItem("uid");
+  const data = await Promise.all(
+    snapshot.docs.map(async (doc) => {
 
-      try {
+      const report = doc.data();
 
-        const res = await fetch(`http://localhost:5000/reports/${uid}`);
-        const data = await res.json();
+      // 🔥 fetch resident info
+      const res = await fetch(`https://connecta-backend-u4tw.onrender.com/resident/${report.reportedBy}`);
+      const user = await res.json();
 
-        const sorted = data.reverse();
-        setReports(sorted);
+      return {
+        id: doc.id,
+        ...report,
+        residentName: `${user.firstname} ${user.lastname}`, // ensure correct
+        email: user.email,
+        contact: user.contact
+      };
 
-      } catch (error) {
-        console.error(error);
-      }
+    })
+  );
 
-    };
 
-    fetchReports();
+  setReports(data);
+  setLoading(false);
+});
 
-  }, []);
+  return () => unsubscribe();
+}, []);
+
 
 
 
@@ -56,18 +77,28 @@ function History() {
   /* Filtering */
   /* -------------------------------- */
 
-  const filteredReports = reports.filter((report) => {
+const filteredReports = reports.filter((report) => {
 
-    const matchSearch =
-      report.category.toLowerCase().includes(search.toLowerCase()) ||
-      report.location.toLowerCase().includes(search.toLowerCase());
+  const matchSearch =
+    report.category.toLowerCase().includes(search.toLowerCase()) ||
+    report.location.toLowerCase().includes(search.toLowerCase());
 
-    const matchStatus =
-      statusFilter === "all" || report.status === statusFilter;
+  const matchStatus =
+    statusFilter === "all" ||
+    report.status?.toLowerCase() === statusFilter;
 
-    return matchSearch && matchStatus;
+const matchDate = (() => {
+  if (!selectedDate) return true;
 
-  });
+  const reportDate = new Date(report.createdAt);
+  const selected = new Date(selectedDate);
+
+  return reportDate.toDateString() === selected.toDateString();
+})();
+
+  return matchSearch && matchStatus && matchDate;
+
+});
 
 
 
@@ -88,25 +119,24 @@ function History() {
   /* Convert Reports -> Table Rows */
   /* -------------------------------- */
 
-  const tableColumns = [
-    "Report ID",
-    "Issue",
-    "Location",
-    "Status",
-    "Date",
-    "Action"
-  ];
+const tableColumns = [
+  "Resident Name",
+  "Issue",
+  "Location",
+  "Status",
+  "Date",
+  "Action"
 
-  const tableData = currentReports.map((report) => ([
-    report.id,
-    report.category,
-    report.location,
-    report.status,
-    report.reportedAt,
-    "Action",
-    report // keep original report object
-  ]));
+];
 
+const tableData = currentReports.map((report) => ([
+report.residentName?.replace(/\b\w/g, c => c.toUpperCase()),  report.category,
+  report.location,
+  report.status.charAt(0).toUpperCase() + report.status.slice(1),
+  new Date(report.createdAt).toLocaleString(),
+  "Action",
+  report
+]));
 
 
   /* -------------------------------- */
@@ -129,6 +159,17 @@ function History() {
 
 
 
+
+if (loading) {
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-14 h-14 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-white text-sm tracking-wide">Loading...</p>
+      </div>
+    </div>
+  );
+}
   return (
     <>
       <Header />
@@ -151,13 +192,13 @@ function History() {
         {/* Title */}
         <div className="mb-8">
 
-          <h1 className="text-3xl font-bold text-gray-800">
-            History
-          </h1>
+<h1 className="text-3xl font-bold text-gray-800">
+  History
+</h1>
 
-          <p className="text-gray-500">
-            View all your submitted reports.
-          </p>
+<p className="text-gray-500 mt-1">
+  View all your submitted reports.
+</p>
 
         </div>
 
@@ -213,31 +254,40 @@ function History() {
 
 
           {/* Search + Filter */}
+{/* Search */}
+<div className="mb-4">
+  <input
+    type="text"
+    placeholder="Search by issue or location..."
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    className="border rounded-xl px-4 py-3 w-full text-sm"
+  />
+</div>
 
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
+{/* Status + Date */}
+<div className="flex gap-3 mb-6">
 
-            <input
-              type="text"
-              placeholder="Search by issue or location..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="border rounded-lg px-4 py-2 w-full md:w-1/2"
-            />
+  <select
+    value={statusFilter}
+    onChange={(e) => setStatusFilter(e.target.value)}
+    className="border rounded-xl px-4 py-3 w-1/2 text-sm"
+  >
+    <option value="all">All Status</option>
+    <option value="pending">Pending</option>
+    <option value="reviewing">Reviewing</option>
+    <option value="ongoing">On-going</option>
+    <option value="resolved">Resolved</option>
+  </select>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border rounded-lg px-4 py-2 w-full md:w-48"
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="reviewing">Reviewing</option>
-              <option value="ongoing">On-going</option>
-              <option value="resolved">Resolved</option>
-            </select>
+  <input
+    type="date"
+    value={selectedDate}
+    onChange={(e) => setSelectedDate(e.target.value)}
+    className="border rounded-xl px-4 py-3 w-1/2 text-sm"
+  />
 
-          </div>
-
+</div>
 
           {/* Table Component */}
 

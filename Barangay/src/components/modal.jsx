@@ -23,8 +23,7 @@ function Modal({ isOpen, onClose, title, children }) {
       ></div>
 
       {/* MODAL BOX */}
-<div className="relative bg-white w-full max-w-4xl rounded-xl shadow-lg p-8 z-10 animate-fadeIn">
-          
+<div className="relative bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl shadow-lg p-8 z-10 animate-fadeIn">          
         {/* HEADER */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold text-[#007CCF]">

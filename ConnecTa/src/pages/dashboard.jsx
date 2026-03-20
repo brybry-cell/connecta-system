@@ -7,7 +7,7 @@ import Card from "../components/card";
 import Button from "../components/button";
 import Preview from "../components/PostPreview";
 import Modal from "../components/modal";
-
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 function Dashboard() {
 
   const [open, setOpen] = useState(false);
@@ -22,6 +22,9 @@ function Dashboard() {
 
   const [newsPosts, setNewsPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
+
+  const [loading, setLoading] = useState(true);
+  const [termsContent, setTermsContent] = useState("");
 
   /* ------------------------------ */
   /* FORMAT TIME */
@@ -48,103 +51,84 @@ function Dashboard() {
 
   };
 
-  /* ------------------------------ */
-  /* CHECK TERMS + USER INFO */
-  /* ------------------------------ */
+  const fetchTerms = async () => {
+  try {
+    const res = await fetch("https://connecta-backend-u4tw.onrender.com/admin/settings/terms");
+    const data = await res.json();
 
-  useEffect(() => {
+    if (data?.content) {
+      setTermsContent(data.content);
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
 
-    const checkTerms = async () => {
-
+useEffect(() => {
+  const init = async () => {
+    try {
       const uid = localStorage.getItem("uid");
       if (!uid) return;
 
+      // USER INFO
       const userRef = doc(db, "residents", uid);
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
-
         const data = userSnap.data();
-
         setResidentName(`${data.firstname} ${data.lastname}`);
 
         if (!data.acceptedTerms) {
           setShowTerms(true);
           setUid(uid);
         }
-
       }
 
-    };
+      // REPORTS
+      const reportRes = await fetch(`https://connecta-backend-u4tw.onrender.com/reports/${uid}`);
+      const reportData = await reportRes.json();
 
-    checkTerms();
+      setTotalReports(reportData.length);
 
-  }, []);
+      const pending = reportData.filter(r =>
+        ["pending", "reviewing", "ongoing"].includes(r.status)
+      );
 
-  /* ------------------------------ */
-  /* FETCH REPORT STATS */
-  /* ------------------------------ */
+      setPendingReports(pending.length);
 
-  useEffect(() => {
 
-    const fetchReportStats = async () => {
+      await fetchTerms();
 
-      const uid = localStorage.getItem("uid");
-      if (!uid) return;
 
-      try {
+    } catch (err) {
+      console.error(err);
+    }
 
-        const res = await fetch(`http://localhost:5000/reports/${uid}`);
-        const data = await res.json();
+    setLoading(false); // ✅ always stop loading
+  };
 
-        setTotalReports(data.length);
+  init();
+}, []);
 
-        const pending = data.filter(report =>
-          report.status === "pending" ||
-          report.status === "reviewing" ||
-          report.status === "ongoing"
-        );
 
-        setPendingReports(pending.length);
+useEffect(() => {
+  const uid = localStorage.getItem("uid");
+  if (!uid) return;
 
-      } catch (error) {
-        console.error(error);
-      }
+  // REALTIME NEWS
+  const q = query(collection(db, "news"), orderBy("createdAt", "desc"));
 
-    };
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const posts = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    setNewsPosts(posts);
+  });
 
-    fetchReportStats();
+  return () => unsubscribe(); // cleanup
+}, []);
 
-  }, []);
-
-  /* ------------------------------ */
-  /* FETCH NEWS */
-  /* ------------------------------ */
-
-  useEffect(() => {
-
-    const fetchNews = async () => {
-
-      try {
-
-        const res = await fetch("http://localhost:5000/news");
-        const data = await res.json();
-
-        setNewsPosts(data);
-
-      } catch (error) {
-        console.error(error);
-      }
-
-    };
-
-    fetchNews();
-
-  }, []);
-
-  /* ------------------------------ */
-  /* ACCEPT TERMS */
-  /* ------------------------------ */
 
   const acceptTerms = async () => {
 
@@ -158,24 +142,51 @@ function Dashboard() {
 
   };
 
-  const handleScroll = (e) => {
+  useEffect(() => {
+  if (termsContent.length < 300) {
+    setScrolledToBottom(true);
+  }
+}, [termsContent]);
 
-    const bottom =
-      e.target.scrollHeight - e.target.scrollTop === e.target.clientHeight;
+const handleScroll = (e) => {
+  const bottom =
+    e.target.scrollTop + e.target.clientHeight >= e.target.scrollHeight - 5;
 
-    if (bottom) {
-      setScrolledToBottom(true);
-    }
+  if (bottom) {
+    setScrolledToBottom(true);
+  }
+};
 
-  };
+
+
+if (loading) {
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-14 h-14 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-white text-sm tracking-wide">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
 
   return (
     <>
       <Header />
       <SideNav open={open} setOpen={setOpen} />
 
-      <div className="md:ml-[260px] pt-6 px-6 pb-10 bg-gray-50 min-h-screen">
-
+<div className="md:ml-[260px] pt-4 px-3 sm:px-4 md:px-6 pb-10 bg-gray-50 min-h-screen">
+        {/* Mobile Menu */}
+        <div className="md:hidden mb-4">
+          <button
+            onClick={() => setOpen(true)}
+            className="text-2xl text-[#007CCF]"
+          >
+            ☰
+          </button>
+        </div>
+        
         {/* Greeting */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800">
@@ -283,6 +294,14 @@ function Dashboard() {
 
           </div>
 
+          <h3 className="font-semibold text-lg mt-4">
+            {selectedPost.title}
+          </h3>
+
+          <p className="text-gray-600 text-sm mt-2 mb-4">
+            {selectedPost.description}
+          </p>
+
           {selectedPost.media?.length === 1 ? (
 
             selectedPost.media[0].includes(".mp4") ?
@@ -313,13 +332,7 @@ function Dashboard() {
 
           )}
 
-          <h3 className="font-semibold text-lg mt-4">
-            {selectedPost.title}
-          </h3>
 
-          <p className="text-gray-600 text-sm mt-2">
-            {selectedPost.description}
-          </p>
 
         </Modal>
 
@@ -327,52 +340,47 @@ function Dashboard() {
 
       {/* TERMS MODAL */}
 
-      {showTerms && (
+  {showTerms && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50">
 
-        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50">
+    <Card
+      title="Terms and Conditions"
+      description=""
+      className="w-[700px] max-h-[80vh] overflow-hidden"
+    >
 
-          <Card
-            title="Terms and Conditions"
-            description=""
-            className="w-[400px] max-h-[500px] overflow-hidden"
-          >
+      <div
+        className="h-[400px] overflow-y-auto text-sm text-gray-700 border p-4 rounded mb-4"
+        onScroll={handleScroll}
+      >
+        {termsContent || "No terms available."}
+      </div>
 
-            <div
-              className="h-48 overflow-y-auto text-sm text-gray-600 border p-3 rounded mb-4"
-              onScroll={handleScroll}
-            >
+      <div className="flex items-center gap-2 mb-4">
 
-              Welcome to the system. By using this platform you agree to follow the
-              community guidelines and use the system responsibly.
+        <input
+          type="checkbox"
+          disabled={!scrolledToBottom && termsContent.length > 300}
+          onChange={(e) => setAgreeChecked(e.target.checked)}
+        />
 
-            </div>
+        <span className="text-sm">
+          I agree to the Terms and Conditions
+        </span>
 
-            <div className="flex items-center gap-2 mb-4">
+      </div>
 
-              <input
-                type="checkbox"
-                disabled={!scrolledToBottom}
-                onChange={(e) => setAgreeChecked(e.target.checked)}
-              />
+      <Button
+        text="Continue"
+        onClick={acceptTerms}
+        disabled={!agreeChecked}
+        className="w-full bg-blue-500 text-white py-2 rounded"
+      />
 
-              <span className="text-sm">
-                I agree to the Terms and Conditions
-              </span>
+    </Card>
 
-            </div>
-
-            <Button
-              text="Continue"
-              onClick={acceptTerms}
-              disabled={!agreeChecked || !scrolledToBottom}
-              className="w-full bg-blue-500 text-white py-2 rounded"
-            />
-
-          </Card>
-
-        </div>
-
-      )}
+  </div>
+)}
 
     </>
   );

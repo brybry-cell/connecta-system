@@ -33,10 +33,14 @@ function Reports() {
   /* FETCH ALL REPORTS */
   const fetchReports = async () => {
 
-    const res = await fetch(`http://localhost:5000/admin/reports?search=${search}`);
+const res = await fetch(`https://connecta-backend-u4tw.onrender.com/admin/reports?search=${search}&adminId=${adminId}`);
     const data = await res.json();
 
-    setReports(data);
+    const sorted = data.sort((a, b) => {
+  return new Date(b.reportedAt) - new Date(a.reportedAt);
+});
+
+setReports(sorted);
 
   };
 
@@ -45,11 +49,31 @@ function Reports() {
 
     if (!adminId) return;
 
-    const res = await fetch(`http://localhost:5000/admin/my-cases/${adminId}`);
+    const res = await fetch(`https://connecta-backend-u4tw.onrender.com/admin/my-cases/${adminId}`);
     const data = await res.json();
 
-    setMyCases(data);
+const statusPriority = {
+  reviewing: 1,
+  ongoing: 2,
+  resolved: 3
+};
 
+const sorted = data.sort((a, b) => {
+
+  // 🔥 PRIORITY SORT FIRST
+  const priorityA = statusPriority[a.status] || 99;
+  const priorityB = statusPriority[b.status] || 99;
+
+  if (priorityA !== priorityB) {
+    return priorityA - priorityB;
+  }
+
+  // 🔥 THEN SORT BY NEWEST
+  return b.createdAt - a.createdAt;
+
+});
+
+setMyCases(sorted);
   };
 
   useEffect(() => {
@@ -60,28 +84,39 @@ function Reports() {
     fetchMyCases();
   }, []);
 
-  /* VIEW REPORT */
-  const handleview = async (report) => {
 
-    await fetch(`http://localhost:5000/admin/assign-report/${report.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ adminId }),
-    });
 
-    setSelectedReport(report);
-    setIsModalOpen(true);
+const handleview = async (report) => {
 
-    fetchReports();
-    fetchMyCases();
-  };
+  // ✅ assign first
+  await fetch(`https://connecta-backend-u4tw.onrender.com/admin/assign-report/${report.id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminId }),
+  });
+
+  // ✅ then GET updated my-cases (with assignedName)
+  const res = await fetch(
+    `https://connecta-backend-u4tw.onrender.com/admin/my-cases/${adminId}`
+  );
+
+  const updated = await res.json();
+
+  const latest = updated.find(r => r.id === report.id);
+
+  // ✅ THIS IS THE KEY
+  setSelectedReport(latest);
+
+  setIsModalOpen(true);
+
+  fetchReports();   // refresh overall (it will disappear)
+  fetchMyCases();   // refresh my cases
+};
 
   /* SEND REVIEW MESSAGE */
   const sendReview = async () => {
 
-    await fetch(`http://localhost:5000/admin/review-report/${selectedReport.id}`, {
+    await fetch(`https://connecta-backend-u4tw.onrender.com/admin/review-report/${selectedReport.id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -123,7 +158,7 @@ function Reports() {
       media.push(data.secure_url);
     }
 
-    await fetch(`http://localhost:5000/admin/resolve-report/${selectedReport.id}`, {
+    await fetch(`https://connecta-backend-u4tw.onrender.com/admin/resolve-report/${selectedReport.id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -144,25 +179,128 @@ function Reports() {
   };
 
   /* FORMAT TABLE DATA */
+const [statusFilter, setStatusFilter] = useState("all");
 
-const overallTable = reports
-  .filter((r) => !r.assignedTo)   // show only unassigned reports
+
+  const [pageOverall, setPageOverall] = useState(1);
+const [pageMyCase, setPageMyCase] = useState(1);
+
+const perPage = 10;
+
+const paginate = (data, page) => {
+  const start = (page - 1) * perPage;
+  return data.slice(start, start + perPage);
+};
+
+const totalPages = (data) => Math.max(1, Math.ceil(data.length / perPage));
+
+const myCaseTable = paginate(
+  myCases
+  .filter((r) => statusFilter === "all" || r.status === statusFilter)
   .map((r) => ([
-    r.residentName,
+<span className="font-bold">
+  {r.residentName
+    .split(" ")
+    .map(name => name.charAt(0).toUpperCase() + name.slice(1))
+    .join(" ")
+  }
+</span>,
     r.category,
-    r.status,
+<span className={`px-2 py-1 rounded text-xs font-semibold
+${r.status === "pending" && "bg-yellow-100 text-yellow-700"}
+${r.status === "reviewing" && "bg-blue-100 text-blue-700"}
+${r.status === "ongoing" && "bg-orange-100 text-orange-700"}
+${r.status === "resolved" && "bg-green-100 text-green-700"}
+`}>
+  {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+</span>,
     r.description,
     r
-  ]));
+  ])),
+  pageMyCase
+);
 
-  const myCaseTable = myCases.map((r) => ([
-    r.residentName,
-    r.category,
-    r.status,
-    r.description,
-    r
-  ]));
+const overallTable = paginate(
+  reports
+    .filter((r) => r.status === "pending") // 🔥 ONLY PENDING
+    .filter((r) => !r.assignedTo) // 🔥 NOT ASSIGNED
+    .map((r) => ([
+<span className="font-bold">
+  {r.residentName
+    .split(" ")
+    .map(name => name.charAt(0).toUpperCase() + name.slice(1))
+    .join(" ")
+  }
+</span>,
+      r.category,
+<span className={`px-2 py-1 rounded text-xs font-semibold
+${r.status === "pending" && "bg-yellow-100 text-yellow-700"}
+${r.status === "reviewing" && "bg-blue-100 text-blue-700"}
+${r.status === "ongoing" && "bg-orange-100 text-orange-700"}
+${r.status === "resolved" && "bg-green-100 text-green-700"}
+`}>
+  {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+</span>,      
+r.description,
+      r
+    ])),
+  pageOverall
+);
 
+const [ongoingMessage, setOngoingMessage] = useState("");
+const sendOngoingUpdate = async () => {
+
+  if (!ongoingMessage.trim()) {
+    alert("Message cannot be empty");
+    return;
+  }
+
+  if (files.length > 0) {
+    alert("Please remove media. Media is only allowed for resolved reports.");
+    return;
+  }
+
+  console.log("Sending message:", ongoingMessage);
+  console.log("Report ID:", selectedReport.id);
+
+  const res = await fetch(`https://connecta-backend-u4tw.onrender.com/admin/update-ongoing/${selectedReport.id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message: ongoingMessage,
+    }),
+  });
+
+  const data = await res.json();
+
+  console.log("Server response:", data);
+
+  if (!res.ok) {
+    alert("Update failed");
+    return;
+  }
+
+  // 🔥 REFETCH UPDATED REPORT (IMPORTANT)
+  const updatedRes = await fetch(
+    `https://connecta-backend-u4tw.onrender.com/admin/my-cases/${adminId}`
+  );
+
+  const updatedData = await updatedRes.json();
+
+  const latest = updatedData.find(r => r.id === selectedReport.id);
+
+  setSelectedReport(latest); // ✅ update modal data
+
+  setOngoingMessage("");
+
+  fetchReports();
+  fetchMyCases();
+
+  // OPTIONAL: keep modal open to see live change
+  // setIsModalOpen(false);
+};
   return (
     <>
       <Header />
@@ -181,16 +319,19 @@ const overallTable = reports
         </div>
 
         {/* TITLE */}
-        <h1 className="text-2xl font-bold text-[#007CCF] mb-6">
+        <h1 className="text-3xl font-bold text-[#007CCF] mb-6">
           Reports Management
         </h1>
 
         {/* SEARCH */}
         <div className="flex justify-end mb-6">
-          <Search
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+<Search
+  value={search}
+  onChange={(e) => setSearch(e.target.value)}
+  onFilter={(status) => setStatusFilter(status)}
+  filterOptions={["all", "pending", "reviewing", "ongoing", "resolved"]}
+
+/>
         </div>
 
         {/* OVERALL REPORTS */}
@@ -206,6 +347,29 @@ const overallTable = reports
             onView={(row) => handleview(row[4])}
           />
 
+<div className="flex justify-center items-center gap-3 mt-4">
+  <button
+    className="bg-blue-600 text-white px-4 py-1 rounded-lg disabled:opacity-50"
+    onClick={() => setPageOverall(p => p - 1)}
+    disabled={pageOverall === 1}
+  >
+    Prev
+  </button>
+
+  <span className="text-sm font-medium">
+    Page {pageOverall} of {totalPages(
+  reports.filter(r => r.status === "pending" && !r.assignedTo)
+)}
+  </span>
+
+  <button
+    className="bg-blue-600 text-white px-4 py-1 rounded-lg disabled:opacity-50"
+    onClick={() => setPageOverall(p => p + 1)}
+    disabled={pageOverall === totalPages(reports.filter(r => !r.assignedTo))}
+  >
+    Next
+  </button>
+</div>
         </div>
 
         {/* MY CASE */}
@@ -218,11 +382,40 @@ const overallTable = reports
           <Table
             columns={columns}
             data={myCaseTable}
-            onView={(row) => {
-              setSelectedReport(row[4]);
-              setIsModalOpen(true);
-            }}
+onView={async (row) => {
+  const report = row[4];
+
+  const res = await fetch(`https://connecta-backend-u4tw.onrender.com/admin/my-cases/${adminId}`);
+  const updated = await res.json();
+
+  const latest = updated.find(r => r.id === report.id);
+
+  setSelectedReport(latest); // ✅ HAS assignedName
+  setIsModalOpen(true);
+}}
           />
+
+          <div className="flex justify-center items-center gap-3 mt-4">
+  <button
+    className="bg-blue-600 text-white px-4 py-1 rounded-lg disabled:opacity-50"
+    onClick={() => setPageMyCase(p => p - 1)}
+    disabled={pageMyCase === 1}
+  >
+    Prev
+  </button>
+
+  <span className="text-sm font-medium">
+    Page {pageMyCase} of {totalPages(myCases)}
+  </span>
+
+  <button
+    className="bg-blue-600 text-white px-4 py-1 rounded-lg disabled:opacity-50"
+    onClick={() => setPageMyCase(p => p + 1)}
+    disabled={pageMyCase === totalPages(myCases)}
+  >
+    Next
+  </button>
+</div>
 
         </div>
 
@@ -264,16 +457,14 @@ url?.includes(".mp4") ?
 key={i}
 src={url}
 controls
-className="w-full h-32 object-cover rounded-lg shadow"
-/>
+className="w-full max-h-[250px] object-contain bg-black rounded-lg"/>
 
 :
 
 <img
 key={i}
 src={url}
-className="w-full h-32 object-cover rounded-lg shadow"
-/>
+className="w-full max-h-[250px] object-contain bg-black rounded-lg"/>
 
 ));
 
@@ -287,42 +478,79 @@ className="w-full h-32 object-cover rounded-lg shadow"
 {/* REPORT INFORMATION */}
 <div className="bg-gray-50 rounded-lg p-4 border">
 
-<h3 className="text-sm font-semibold text-gray-600 mb-3">
-Report Information
-</h3>
+  <h3 className="text-sm font-semibold text-gray-600 mb-3">
+    Report Information
+  </h3>
 
-<div className="grid md:grid-cols-2 gap-3 text-sm">
+  <div className="space-y-4 text-sm">
 
-<p><span className="font-semibold">Report By:</span> {selectedReport.residentName}</p>
+    {/* DATE */}
+    <p className="font-semibold text-gray-800">
+      {new Date(selectedReport.createdAt).toLocaleString()}
+    </p>
 
-<p><span className="font-semibold">Issue Type:</span> {selectedReport.category}</p>
+    {/* ISSUE + STATUS */}
+    <div className="grid grid-cols-2 gap-4">
+      <p>
+        <span className="text-gray-500">Issue Type: </span>
+        <span className="font-semibold">{selectedReport.category}</span>
+      </p>
 
-<p><span className="font-semibold">Date & Time:</span> {selectedReport.reportedAt}</p>
+      <p>
+        <span className="text-gray-500">Status: </span>
+        <span className={`px-2 py-1 rounded text-xs font-semibold
+          ${selectedReport.status === "pending" && "bg-yellow-100 text-yellow-700"}
+          ${selectedReport.status === "reviewing" && "bg-blue-100 text-blue-700"}
+          ${selectedReport.status === "ongoing" && "bg-orange-100 text-orange-700"}
+          ${selectedReport.status === "resolved" && "bg-green-100 text-green-700"}
+        `}>
+          {selectedReport.status}
+        </span>
+      </p>
+    </div>
 
-<p>
-<span className="font-semibold">Status:</span>{" "}
-<span className={`px-2 py-1 rounded text-xs font-semibold
-${selectedReport.status === "pending" && "bg-yellow-100 text-yellow-700"}
-${selectedReport.status === "reviewing" && "bg-blue-100 text-blue-700"}
-${selectedReport.status === "ongoing" && "bg-orange-100 text-orange-700"}
-${selectedReport.status === "resolved" && "bg-green-100 text-green-700"}
-`}>
-{selectedReport.status}
+    {/* NAME + EMAIL */}
+    <div className="grid grid-cols-2 gap-4">
+      <p>
+        <span className="text-gray-500">Name: </span>
+        <span className="font-semibold">
+          {selectedReport.residentName
+            ?.replace(/\b\w/g, c => c.toUpperCase())}
+        </span>
+      </p>
+
+      <p>
+        <span className="text-gray-500">Email: </span>
+        <span className="font-semibold">{selectedReport.email}</span>
+      </p>
+    </div>
+
+    {/* CONTACT */}
+    <p>
+      <span className="text-gray-500">Contact Number: </span>
+      <span className="font-semibold">{selectedReport.contact}</span>
+    </p>
+
+    {/* ASSIGNED TO */}
+    <p>
+      <span className="text-gray-500">Assigned To: </span>
+     <span className="font-semibold">
+  {selectedReport.assignedName
+    ? selectedReport.assignedName
+        .replace(/\b\w/g, c => c.toUpperCase())
+    : "Not assigned"}
 </span>
-</p>
+    </p>
 
-<p className="md:col-span-2">
-<span className="font-semibold">Description:</span> {selectedReport.description}
-</p>
+    {/* DESCRIPTION */}
+    <p>
+      <span className="text-gray-500">Description: </span>
+      <span>{selectedReport.description}</span>
+    </p>
 
-<p><span className="font-semibold">Email:</span> {selectedReport.email}</p>
-
-<p><span className="font-semibold">Contact Number:</span> {selectedReport.contact}</p>
-
-</div>
+  </div>
 
 </div>
-
 
 {/* REVIEWING SECTION */}
 {selectedReport.status === "reviewing" && (
@@ -360,46 +588,78 @@ Send Update
 {/* ONGOING SECTION */}
 {selectedReport.status === "ongoing" && (
 
-<div className="space-y-4">
+<div className="space-y-6">
 
-<h3 className="text-sm font-semibold text-gray-600">
-Resolve Report
-</h3>
+  {/* ================= Ongoing Update ================= */}
+  <div className="space-y-3">
 
-<textarea
-className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-placeholder="Write resolution message..."
-rows="3"
-value={resolveMessage}
-onChange={(e) => setResolveMessage(e.target.value)}
-/>
+    <h3 className="text-sm font-semibold text-gray-600">
+      Ongoing Update
+    </h3>
 
-<div>
+    <textarea
+      className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+      placeholder="Write update for the resident..."
+      rows="3"
+      value={ongoingMessage}
+      onChange={(e) => setOngoingMessage(e.target.value)}
+    />
 
-<label className="block text-sm font-medium mb-1">
-Upload Proof of Action
-</label>
+    <p className="text-xs text-gray-500">
+      Note: Media upload is only allowed when resolving the report.
+    </p>
 
-<input
-type="file"
-multiple
-accept="image/*,video/*"
-className="text-sm"
-onChange={(e) => setFiles([...e.target.files])}
-/>
+    <div className="flex justify-end">
+      <button
+        onClick={sendOngoingUpdate}
+        className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2 rounded-lg text-sm shadow"
+      >
+        Send Update
+      </button>
+    </div>
 
-</div>
+  </div>
 
-<div className="flex justify-end">
 
-<button
-onClick={resolveReport}
-className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-sm shadow"
->
-Mark as Resolved
-</button>
+  {/* ================= RESOLVE REPORT ================= */}
+  <div className="space-y-3 border-t pt-4">
 
-</div>
+    <h3 className="text-sm font-semibold text-gray-600">
+      Resolve Report (Final Action)
+    </h3>
+
+    <textarea
+      className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+      placeholder="Write resolution message..."
+      rows="3"
+      value={resolveMessage}
+      onChange={(e) => setResolveMessage(e.target.value)}
+    />
+
+    <div>
+      <label className="block text-sm font-medium mb-1">
+        Upload Proof of Action
+      </label>
+
+      <input
+        type="file"
+        multiple
+        accept="image/*,video/*"
+        className="text-sm"
+        onChange={(e) => setFiles([...e.target.files])}
+      />
+    </div>
+
+    <div className="flex justify-end">
+      <button
+        onClick={resolveReport}
+        className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-sm shadow"
+      >
+        Mark as Resolved
+      </button>
+    </div>
+
+  </div>
 
 </div>
 

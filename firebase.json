@@ -1,0 +1,26 @@
+{
+  "hosting": [
+    {
+      "site": "webconnecta-81bb3",
+      "public": "ConnecTa/dist",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    {
+      "site": "webconnecta-admin",
+      "public": "Barangay/dist",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    }
+  ]
+}

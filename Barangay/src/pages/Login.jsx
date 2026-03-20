@@ -35,16 +35,34 @@ const userCredential = await signInWithEmailAndPassword(
         return;
       }
 
-      const userData = userSnap.data();
+const userData = userSnap.data();
 
-      if (userData.role !== "admin") {
-        alert("Access denied. Admin only.");
-        return;
-      }
+// 🔥 GET ROLES FROM BACKEND
+const res = await fetch("https://connecta-backend-u4tw.onrender.com/admin/settings/roles");
+const roleData = await res.json();
 
-      localStorage.setItem("adminUID", user.uid);
+// CHECK IF ROLE EXISTS
+const matchedRole = roleData?.roles?.find(
+  (r) => r.name.toLowerCase() === userData.role.toLowerCase()
+);
 
-      alert("Admin Login Successful");
+if (!matchedRole) {
+  alert("Access denied. No role assigned.");
+  return;
+}
+
+// GET PERMISSIONS
+const permissions = matchedRole?.permissions || [];
+
+// SAVE USER WITH PERMISSIONS
+const fullUser = {
+  uid: user.uid,
+  role: userData.role,
+  permissions
+};
+
+localStorage.setItem("user", JSON.stringify(fullUser));
+
 
       navigate("/dashboard");
 
@@ -82,6 +100,8 @@ const userCredential = await signInWithEmailAndPassword(
 
   };
 
+  const [showPassword, setShowPassword] = useState(false);
+  
   return (
     <div className="min-h-screen bg-[url('./src/assets/updatebg.png')] bg-cover bg-center bg-no-repeat flex items-center justify-center px-4">
 
@@ -101,15 +121,24 @@ const userCredential = await signInWithEmailAndPassword(
           />
         </div>
 
-        <div className="mb-6">
-          <InputField
-            type="password"
-            placeholder="Enter your password"
-            text="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
+<div className="mb-6 relative">
+  <InputField
+    type={showPassword ? "text" : "password"}
+    placeholder="Enter your password"
+    text="Password"
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+  />
+
+  {/* Toggle Button */}
+  <button
+    type="button"
+    onClick={() => setShowPassword(!showPassword)}
+    className="absolute right-3 top-10 text-sm text-blue-500 hover:text-blue-200"
+  >
+    {showPassword ? "Hide" : "Show"}
+  </button>
+</div>
 
         <Button
           text="Login"

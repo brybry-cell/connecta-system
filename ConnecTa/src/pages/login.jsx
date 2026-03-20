@@ -15,9 +15,7 @@ function Login() {
   const [loading, setLoading] = useState("");
 
 const handleLogin = async () => {
-
   try {
-
     setLoading(true);
 
     const userCredential = await signInWithEmailAndPassword(
@@ -28,7 +26,6 @@ const handleLogin = async () => {
 
     const user = userCredential.user;
 
-    // check firestore resident document
     const residentRef = doc(db, "residents", user.uid);
     const residentSnap = await getDoc(residentRef);
 
@@ -47,17 +44,16 @@ const handleLogin = async () => {
     localStorage.setItem("uid", user.uid);
 
     alert("Login Successfully!");
-
     navigate("/dashboard");
 
   } catch (error) {
-
     alert("Invalid email or password");
-
+  } finally {
+    setLoading(false); // ✅ ALWAYS runs
   }
-
-  setLoading(false);
 };
+
+const [showPassword, setShowPassword] = useState(false);
   return (
     <div className="min-h-screen bg-[url('/src/assets/background.png')] bg-cover bg-center bg-no-repeat flex items-center justify-center px-4">
       
@@ -81,15 +77,24 @@ const handleLogin = async () => {
         </div>
 
         {/* Password */}
-        <div className="mb-6">
-          <InputField
-            type="password"
-            placeholder="Enter your password"
-            text="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
+<div className="mb-6 relative">
+  <InputField
+    type={showPassword ? "text" : "password"}
+    placeholder="Enter your password"
+    text="Password"
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+  />
+
+  {/* Toggle Button */}
+  <button
+    type="button"
+    onClick={() => setShowPassword(!showPassword)}
+    className="absolute right-3 top-10 text-sm text-blue-500 hover:text-blue-200"
+  >
+    {showPassword ? "Hide" : "Show"}
+  </button>
+</div>
 
         {/* Button */}
 <Button

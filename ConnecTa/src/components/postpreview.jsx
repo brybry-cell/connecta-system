@@ -1,73 +1,69 @@
 import "./postpreview.css";
-import profile from "../assets/profile.png";
 
 function PostPreview({ name, position, time, title, content, clickable }) {
-
   return (
-
     <div
-      className={`max-w-[1075px] w-[90%] mx-auto mt-[20px] 
-      border border-[#007CCF] 
-      rounded-xl p-6
-      bg-[#F5F5F5] gap-[4px] shadow-md
-      ${clickable ? "cursor-pointer hover:shadow-lg transition" : ""}`}
+      className={`
+        w-full 
+        mt-3
+        border border-[#007CCF]
+        rounded-xl 
+        p-4 sm:p-5
+        bg-[#F5F5F5] 
+        shadow-md
+        ${clickable ? "cursor-pointer hover:shadow-lg transition" : ""}
+      `}
     >
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
 
-        <div className="flex items-center gap-[10px]">
+        <div className="flex items-center gap-3">
 
           <img
-            src={profile}
+            src="https://i.pravatar.cc/40"
             alt="Profile"
-            className="w-13 h-13 rounded-full object-cover shrink-0"
+            className="w-10 h-10 rounded-full object-cover"
           />
 
-          <div className="flex flex-col">
-
-            <h2 className="m-0 text-[16px] font-semibold text-gray-800">
+          <div>
+            <h2 className="text-sm sm:text-base font-semibold text-gray-800 leading-tight">
               {name}
             </h2>
 
-            <p className="m-0 mt-[2px] text-[12px] text-[#1976d2]">
+            <p className="text-xs text-[#1976d2]">
               {position}
             </p>
-
           </div>
 
         </div>
 
-        {/* Time posted */}
-        <p className="text-[12px] text-gray-400">
+        {/* Time */}
+        <p className="text-xs text-gray-400 sm:text-right">
           {time}
         </p>
 
       </div>
 
       {/* Title */}
-      <h3 className="text-[18px] font-bold mt-[10px] mb-[10px]">
+      <h3 className="text-base sm:text-lg font-bold mb-1">
         {title}
       </h3>
 
       {/* Content */}
-      <p className="text-[15px] leading-relaxed m-0 max-w-[1000px] text-left">
+      <p className="text-sm text-gray-700 leading-relaxed">
         {content}
       </p>
 
       {/* Click Hint */}
       {clickable && (
-
-        <p className="text-blue-500 text-[13px] mt-3">
+        <p className="text-blue-500 text-xs mt-3">
           Click to see the full news
         </p>
-
       )}
 
     </div>
-
   );
-
 }
 
 export default PostPreview;

@@ -32,7 +32,7 @@ app.post("/signup", async (req, res) => {
       proofOfResidency,
       acceptedTerms: false,
       isverified: false,
-      createdAt: new Date().toLocaleDateString()
+      createdAt: Date.now()
     });
 
     res.status(200).json({
@@ -65,16 +65,19 @@ app.post("/report", async (req, res) => {
 
     const residentData = residentDoc.data();
 
-    const reportData = {
-      category,
-      location,
-      description,
-      proofofReport,
-      reportedBy: uid,
-      residentName: residentData.firstname + " " + residentData.lastname,
-      status: "pending",
-      reportedAt: new Date().toLocaleString()
-    };
+const reportData = {
+  category,
+  location,
+  description,
+  proofofReport,
+  reportedBy: uid,
+  residentName: residentData.firstname + " " + residentData.lastname,
+  email: residentData.email,        // ✅ ADD THIS
+  contact: residentData.contact,    // ✅ ADD THIS
+  status: "pending",
+  assignedTo: null,
+  createdAt: Date.now()
+};
 
     const reportRef = await db.collection("reports").add(reportData);
 
@@ -133,15 +136,14 @@ app.put("/approve-resident/:uid", async (req, res) => {
 app.get("/staffs", async (req, res) => {
   try {
 
-    const snapshot = await db
-      .collection("residents")
-      .where("role", "==", "admin")
-      .get();
+    const snapshot = await db.collection("residents").get();
 
-    const staffs = snapshot.docs.map(doc => ({
-      uid: doc.id,
-      ...doc.data()
-    }));
+    const staffs = snapshot.docs
+      .map(doc => ({
+        uid: doc.id,
+        ...doc.data()
+      }))
+      .filter(user => user.role !== "resident"); // ✅ EXCLUDE RESIDENTS
 
     res.json(staffs);
 
@@ -292,61 +294,10 @@ app.get("/admin/reports", async (req, res) => {
 
   try {
 
-    const snapshot = await db.collection("reports").get();
-
-    const reports = await Promise.all(
-      snapshot.docs.map(async (doc) => {
-
-        const report = doc.data();
-
-        const residentDoc = await db
-          .collection("residents")
-          .doc(report.reportedBy)
-          .get();
-
-        const resident = residentDoc.data();
-
-        return {
-          id: doc.id,
-          ...report,
-          email: resident?.email || "",
-          contact: resident?.contact || ""
-        };
-
-      })
-    );
-
-    let filtered = reports;
-
-    if (search) {
-      const s = search.toLowerCase();
-      filtered = filtered.filter(r =>
-        r.residentName.toLowerCase().includes(s) ||
-        r.category.toLowerCase().includes(s)
-      );
-    }
-
-    if (status) {
-      filtered = filtered.filter(r => r.status === status);
-    }
-
-    res.json(filtered);
-
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-
-});
-
-app.get("/admin/my-cases/:adminId", async (req, res) => {
-
-  const { adminId } = req.params;
-
-  try {
-
+    // ✅ ONLY UNASSIGNED
     const snapshot = await db
       .collection("reports")
-      .where("assignedTo", "==", adminId)
+      .where("assignedTo", "==", null)
       .get();
 
     const reports = await Promise.all(
@@ -370,6 +321,63 @@ app.get("/admin/my-cases/:adminId", async (req, res) => {
 
       })
     );
+
+    res.json(reports);
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+
+});
+
+app.get("/admin/my-cases/:adminId", async (req, res) => {
+
+  const { adminId } = req.params;
+
+  try {
+
+    const snapshot = await db
+      .collection("reports")
+      .where("assignedTo", "==", adminId)
+      .get();
+
+const reports = await Promise.all(
+  snapshot.docs.map(async (doc) => {
+
+    const report = doc.data();
+
+    const residentDoc = await db
+      .collection("residents")
+      .doc(report.reportedBy)
+      .get();
+
+    const resident = residentDoc.data();
+
+    let assignedName = null;
+
+    if (report.assignedTo) {
+      const assignedDoc = await db
+        .collection("residents")
+        .doc(report.assignedTo)
+        .get();
+
+      const assignedData = assignedDoc.data();
+
+      assignedName = assignedData
+        ? assignedData.firstname + " " + assignedData.lastname
+        : null;
+    }
+
+    return {
+      id: doc.id,
+      ...report,
+      email: resident?.email || "",
+      contact: resident?.contact || "",
+      assignedName
+    };
+
+  })
+);
 
     res.json(reports);
 
@@ -473,7 +481,7 @@ schedule,
 adminUID,
 postedBy: adminData.firstname + " " + adminData.lastname,
 role: adminData.role,
-createdAt: new Date().toLocaleString()
+createdAt: Date.now()
 };
 
 const doc = await db.collection("news").add(post);
@@ -497,31 +505,32 @@ const snapshot = await db.collection("news")
 .orderBy("createdAt","desc")
 .get();
 
-const posts = snapshot.docs.map(doc=>({
-id:doc.id,
-...doc.data()
-}));
+const now = new Date();
 
-res.json(posts);
+const posts = snapshot.docs
+  .map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }))
+  .filter(post => {
 
-}catch(err){
-res.status(500).json({error:err.message});
-}
+    // if NOT scheduled → show
+    if (post.status !== "Scheduled") return true;
 
-});
+    // if scheduled → check time
+    const scheduleDate = new Date(post.schedule);
 
-app.get("/news", async (req,res)=>{
+    return now >= scheduleDate;
+  })
+  .map(post => {
 
-try{
+    // OPTIONAL: auto change status
+    if (post.status === "Scheduled") {
+      return { ...post, status: "Published" };
+    }
 
-const snapshot = await db.collection("news")
-.orderBy("createdAt","desc")
-.get();
-
-const posts = snapshot.docs.map(doc=>({
-id:doc.id,
-...doc.data()
-}));
+    return post;
+  });
 
 res.json(posts);
 
@@ -563,7 +572,121 @@ res.status(500).json({error:err.message});
 
 });
 
+app.post("/create-staff", async (req, res) => {
 
+  const { firstname, lastname, email, phone, role } = req.body;
+
+  try {
+
+    // CREATE AUTH USER
+    const user = await admin.auth().createUser({
+      email: email,
+      password: "123456"
+    });
+
+    // 🔥 GET ROLES FROM SETTINGS
+    const roleDoc = await db.collection("system_settings").doc("roles").get();
+
+    let permissions = [];
+
+    if (roleDoc.exists) {
+      const rolesData = roleDoc.data().roles;
+
+      const selectedRole = rolesData.find(
+        r => r.name.toLowerCase() === role.toLowerCase()
+      );
+
+      permissions = selectedRole?.permissions || [];
+    }
+
+    // SAVE TO FIRESTORE
+await db.collection("residents").doc(user.uid).set({
+  firstname,
+  lastname,
+  email,
+  contact: phone,
+  address: "",
+  role,
+  permissions: permissions || [], // ✅ ensure always array
+  isverified: true,
+ createdAt: Date.now()
+});
+
+    res.json({ message: "Staff created successfully" });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+
+});
+
+app.get("/admin/news", async (req,res)=>{
+  try{
+
+    const snapshot = await db.collection("news")
+      .orderBy("createdAt","desc")
+      .get();
+
+    const posts = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    res.json(posts);
+
+  }catch(err){
+    res.status(500).json({error:err.message});
+  }
+});
+
+
+app.post("/admin/settings/:type", async (req, res) => {
+  const { type } = req.params;
+  const data = req.body;
+
+  try {
+    await db.collection("system_settings").doc(type).set(data);
+    res.json({ message: "Saved successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/admin/settings/:type", async (req, res) => {
+  const { type } = req.params;
+
+  try {
+    const doc = await db.collection("system_settings").doc(type).get();
+
+    if (!doc.exists) {
+      return res.json(null);
+    } 
+
+    res.json(doc.data());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/admin/update-ongoing/:id", async (req, res) => {
+
+  const { id } = req.params;
+  const { message } = req.body;
+
+  try {
+
+    await db.collection("reports").doc(id).update({
+      adminMessage: message,   // overwrite OR store latest
+      updatedAt: Date.now()
+    });
+
+    res.json({ message: "Ongoing update sent successfully" });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+
+});
 app.listen(5000, () => {
   console.log("Server running on port 5000");
 });

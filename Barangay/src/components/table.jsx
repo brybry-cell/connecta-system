@@ -1,4 +1,4 @@
-function Table({ columns, data, onEdit, onDelete, onRowClick }) {
+function Table({ columns, data, onView, onEdit, onDelete, onRowClick }) {
 
   return (
     <div className="flex justify-center mt-6 px-2">
@@ -26,56 +26,82 @@ function Table({ columns, data, onEdit, onDelete, onRowClick }) {
             {/* BODY */}
             <tbody className="divide-y divide-gray-200">
 
-              {data.map((row, rowIndex) => (
+              {data.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    className="text-center py-10 text-gray-500"
+                  >
+                    No records available
+                  </td>
+                </tr>
+              ) : (
 
-                <tr
-                  key={rowIndex}
-                  onClick={() => onRowClick && onRowClick(row)}
-                  className="hover:bg-gray-50 transition cursor-pointer"
-                >
+                data.map((row, rowIndex) => (
 
-                  {row.slice(0, columns.length).map((cell, cellIndex) => {
+                  <tr
+                    key={rowIndex}
+                    onClick={() => onRowClick && onRowClick(row)}
+                    className="hover:bg-gray-50 transition cursor-pointer"
+                  >
 
-                    if (columns[cellIndex] === "Action") {
+                    {row.slice(0, columns.length).map((cell, cellIndex) => {
+
+                      if (columns[cellIndex] === "Action") {
+                        return (
+                          <td
+                            key={cellIndex}
+                            className="px-4 md:px-6 py-4 flex flex-col sm:flex-row gap-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+
+                            {onView && (
+                              <button
+                                onClick={() => onView(row)}
+                                className="px-3 py-1 text-xs bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200"
+                              >
+                                View
+                              </button>
+                            )}
+
+                            {onEdit && (
+                              <button
+                                onClick={() => onEdit(row)}
+                                className="px-3 py-1 text-xs bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200"
+                              >
+                                Edit
+                              </button>
+                            )}
+
+                            {onDelete && (
+                              <button
+                                onClick={() => onDelete(row)}
+                                className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded-md hover:bg-red-200"
+                              >
+                                Delete
+                              </button>
+                            )}
+
+                          </td>
+                        );
+                      }
+
                       return (
                         <td
                           key={cellIndex}
-                          className="px-4 md:px-6 py-4 flex flex-col sm:flex-row gap-2"
-                          onClick={(e) => e.stopPropagation()}
+                          className="px-4 md:px-6 py-4 text-gray-700 whitespace-nowrap"
                         >
-
-                          <button
-                            onClick={() => onEdit(row)}
-                            className="px-3 py-1 text-xs bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            onClick={() => onDelete(row)}
-                            className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded-md hover:bg-red-200"
-                          >
-                            Delete
-                          </button>
-
+                          {cell}
                         </td>
                       );
-                    }
 
-                    return (
-                      <td
-                        key={cellIndex}
-                        className="px-4 md:px-6 py-4 text-gray-700 whitespace-nowrap"
-                      >
-                        {cell}
-                      </td>
-                    );
+                    })}
 
-                  })}
+                  </tr>
 
-                </tr>
+                ))
 
-              ))}
+              )}
 
             </tbody>
 

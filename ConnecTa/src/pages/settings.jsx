@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import profileDefault from "../assets/profile.png";
 import { uploadToCloudinary } from "../utils/cloudinary";
 
+
 function Settings(){
 
 const uid = localStorage.getItem("uid");
@@ -42,7 +43,7 @@ useEffect(()=>{
 
 const fetchUser = async()=>{
 
-const res = await fetch(`http://localhost:5000/resident/${uid}`);
+const res = await fetch(`https://connecta-backend-u4tw.onrender.com/resident/${uid}`);
 const data = await res.json();
 
 setUser(data);
@@ -94,7 +95,7 @@ setUser({...user,profileImage:url});
 
 const updateAccount=async()=>{
 
-await fetch(`http://localhost:5000/update-account/${uid}`,{
+await fetch(`https://connecta-backend-u4tw.onrender.com/update-account/${uid}`,{
 
 method:"PUT",
 headers:{"Content-Type":"application/json"},
@@ -127,7 +128,7 @@ alert("Passwords do not match");
 return;
 }
 
-await fetch(`http://localhost:5000/update-password/${uid}`,{
+await fetch(`https://connecta-backend-u4tw.onrender.com/update-password/${uid}`,{
 
 method:"PUT",
 headers:{"Content-Type":"application/json"},
@@ -145,7 +146,7 @@ alert("Password updated");
 
 const confirmDelete=async()=>{
 
-await fetch(`http://localhost:5000/delete-account/${uid}`,{
+await fetch(`https://connecta-backend-u4tw.onrender.com/delete-account/${uid}`,{
 method:"DELETE"
 });
 
@@ -177,6 +178,38 @@ ${danger?"hover:bg-red-50":"hover:bg-blue-50"}`}
 );
 
 
+const [helpData, setHelpData] = useState([]);
+const [privacyData, setPrivacyData] = useState("");
+const [aboutData, setAboutData] = useState("");
+
+useEffect(() => {
+
+  const fetchSystemSettings = async () => {
+    try {
+
+      // HELP SUPPORT
+      const helpRes = await fetch("https://connecta-backend-u4tw.onrender.com/admin/settings/help_support");
+      const help = await helpRes.json();
+      setHelpData(help?.sections || []);
+
+      // PRIVACY
+      const privacyRes = await fetch("https://connecta-backend-u4tw.onrender.com/admin/settings/privacy");
+      const privacy = await privacyRes.json();
+      setPrivacyData(privacy?.content || "");
+
+      // ABOUT
+      const aboutRes = await fetch("https://connecta-backend-u4tw.onrender.com/admin/settings/about");
+      const about = await aboutRes.json();
+      setAboutData(about?.content || "");
+
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  fetchSystemSettings();
+
+}, []);
 
 return(
 
@@ -257,37 +290,55 @@ onClick={()=>setModal("about")}
 
 {/* ================= DESKTOP VIEW ================= */}
 
-<div className="hidden md:block px-6 py-8">
+<div className="hidden md:block px-6 py-7">
 
-<h1 className="text-3xl font-bold text-gray-800 mb-6">
-Settings
-</h1>
+  <h2 className="text-3xl font-bold text-[#007CCF] mb-6">
+    Settings
+  </h2>
 
-<div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg border p-6">
+  <div className="max-w-5xl mx-auto space-y-6">
 
-<h3 className="text-xs uppercase text-gray-500 mb-2">Account</h3>
+    {/* ACCOUNT */}
+    <div className="bg-white rounded-2xl shadow-md border p-5">
+      <p className="text-xs font-semibold text-gray-400 mb-3">
+        ACCOUNT
+      </p>
 
-<SettingItem label="Account Information" onClick={()=>setModal("account")} />
+      <SettingItem label="Account Information" onClick={()=>setModal("account")} />
+    </div>
 
-<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">Notifications</h3>
+    {/* SUPPORT */}
+    <div className="bg-white rounded-2xl shadow-md border p-5">
+      <p className="text-xs font-semibold text-gray-400 mb-3">
+        SUPPORT
+      </p>
 
-<SettingItem label="Notification Settings" onClick={()=>setModal("notifications")} />
+      <SettingItem label="Help & Support" onClick={()=>setModal("support")} />
+    </div>
 
-<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">Support</h3>
+    {/* PRIVACY */}
+    <div className="bg-white rounded-2xl shadow-md border p-5">
+      <p className="text-xs font-semibold text-gray-400 mb-3">
+        PRIVACY
+      </p>
 
-<SettingItem label="Help & Support" onClick={()=>setModal("support")} />
+      <SettingItem label="Privacy & Security" onClick={()=>setModal("privacy")} />
 
-<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">Privacy</h3>
+      <div className="mt-2">
+        <SettingItem label="Delete Account" danger onClick={()=>setModal("delete")} />
+      </div>
+    </div>
 
-<SettingItem label="Privacy & Security" onClick={()=>setModal("privacy")} />
+    {/* ABOUT */}
+    <div className="bg-white rounded-2xl shadow-md border p-5">
+      <p className="text-xs font-semibold text-gray-400 mb-3">
+        ABOUT
+      </p>
 
-<SettingItem label="Delete Account" danger onClick={()=>setModal("delete")} />
+      <SettingItem label="About Connecta" onClick={()=>setModal("about")} />
+    </div>
 
-<h3 className="text-xs uppercase text-gray-500 mt-6 mb-2">About</h3>
-
-<SettingItem label="About Connecta" onClick={()=>setModal("about")} />
-
-</div>
+  </div>
 
 </div>
 
@@ -297,19 +348,19 @@ Settings
 
 {/* ================= CENTRALIZED MODAL ================= */}
 
-{modal && (
-
 <Modal
-title={
-modal==="account"?"Account Information":
-modal==="notifications"?"Notification Settings":
-modal==="support"?"Help & Support":
-modal==="privacy"?"Privacy & Security":
-modal==="delete"?"Delete Account":
-modal==="about"?"About Connecta":
-"Settings"
-}
-onClose={()=>setModal(null)}
+  isOpen={modal !== null}
+  onClose={()=>setModal(null)}
+  size="xl" // 🔥 THIS IS THE KEY
+  title={
+    modal==="account"?"Account Information":
+    modal==="notifications"?"Notification Settings":
+    modal==="support"?"Help & Support":
+    modal==="privacy"?"Privacy & Security":
+    modal==="delete"?"Delete Account":
+    modal==="about"?"About Connecta":
+    "Settings"
+  }
 >
 
 {/* ACCOUNT */}
@@ -479,9 +530,81 @@ Delete
 
 )}
 
-</Modal>
+{modal==="support" && (
+
+<div className="space-y-6 max-h-[70vh] overflow-y-auto">
+
+  {helpData.map((section, sIndex) => (
+
+    <div key={sIndex} className="space-y-3">
+
+      {/* DESCRIPTION */}
+      {section.description && (
+        <p className="text-sm text-gray-600">
+          {section.description}
+        </p>
+      )}
+
+      {/* QUESTIONS */}
+      {(section.questions || []).map((q, qIndex) => (
+
+        <div key={qIndex} className="border rounded-lg p-3">
+
+          {/* QUESTION */}
+          <button
+            onClick={() => {
+              const updated = [...helpData];
+              updated[sIndex].questions[qIndex].open =
+                !updated[sIndex].questions[qIndex].open;
+              setHelpData(updated);
+            }}
+            className="w-full text-left font-medium text-gray-700"
+          >
+            {q.question}
+          </button>
+
+          {/* ANSWER */}
+          {q.open && (
+            <p className="text-sm text-gray-600 mt-2">
+              {q.answer}
+            </p>
+          )}
+
+        </div>
+
+      ))}
+
+    </div>
+
+  ))}
+
+</div>
 
 )}
+
+{modal==="privacy" && (
+
+<div className="max-h-[70vh] overflow-y-auto">
+  <p className="text-sm text-gray-700 whitespace-pre-line">
+    {privacyData || "No data available"}
+  </p>
+</div>
+
+)}
+
+{modal==="about" && (
+
+<div className="max-h-[70vh] overflow-y-auto">
+  <p className="text-sm text-gray-700 whitespace-pre-line">
+    {aboutData || "No data available"}
+  </p>
+</div>
+
+)}
+
+
+</Modal>
+
 
 </>
 

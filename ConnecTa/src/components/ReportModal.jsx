@@ -7,8 +7,7 @@ function ReportModal({ report, onClose }) {
     ? report.proofofReport
     : [report.proofofReport];
 
-  const [activeMedia, setActiveMedia] = useState(mediaList[0]);
-
+  const [activeMedia, setActiveMedia] = useState(mediaList[0] || null);
   const [feedback, setFeedback] = useState({
     q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",q7:"",comment:""
   });
@@ -23,23 +22,32 @@ function ReportModal({ report, onClose }) {
     ongoing:"bg-orange-100 text-orange-700",
     resolved:"bg-green-100 text-green-700"
   };
+
+  // ✅ FIXED: proper helper
+const isVideo = (file) => {
+  if (!file) return false;
+
+  return (
+    file.endsWith(".mp4") ||
+    file.endsWith(".mov") ||
+    file.endsWith(".webm")
+  );
+};
   return (
 
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-
-      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-xl overflow-hidden max-h-[90vh] overflow-y-auto">
+<div className="fixed inset-0 bg-black/40 flex items-start sm:items-center justify-center z-50">
+<div className="bg-white w-full max-w-4xl sm:rounded-2xl rounded-t-2xl h-full sm:h-auto max-h-[100vh] sm:max-h-[90vh] overflow-hidden shadow-xl">
 
         {/* Header */}
-        <div className="flex justify-between items-start border-b px-6 py-4">
-
-          <div>
+<div className="flex items-center justify-between border-b px-4 sm:px-6 py-3">
+          <div className="flex flex-col">
             <h2 className="text-xl font-bold text-gray-800">
               Report Details
             </h2>
 
-            <div className="mt-1">
-              <span className={`text-xs px-3 py-1 rounded-full font-medium ${statusColor[report.status]}`}>
-                {report.status}
+            <div className="mt-2">
+              <span className={`text-xs px-3 py-1 rounded-full font-medium ${statusColor[report.status] || "bg-gray-100 text-gray-600"}`}>
+                {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
               </span>
             </div>
           </div>
@@ -55,28 +63,28 @@ function ReportModal({ report, onClose }) {
 
 
         {/* Body */}
-        <div className="p-6 space-y-6">
-
+<div className="overflow-y-auto p-4 sm:p-6 space-y-5 max-h-[80vh]">
 
           {/* MEDIA VIEWER */}
 
-          <div className="bg-black rounded-xl flex items-center justify-center overflow-hidden">
+          {activeMedia && (
+<div className="bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
+              {isVideo(activeMedia) ? (
+                <video
+                  controls
+                  src={activeMedia}
+                  className="max-h-[420px] w-full object-contain"
+                />
+              ) : (
+                <img
+                  src={activeMedia}
+                  alt="report media"
+                  className="max-h-[420px] w-full object-contain"
+                />
+              )}
 
-            {activeMedia.includes(".mp4") || activeMedia.includes(".mov") ? (
-              <video
-                controls
-                src={activeMedia}
-                className="max-h-[420px] w-full object-contain"
-              />
-            ) : (
-              <img
-                src={activeMedia}
-                alt="report media"
-                className="max-h-[420px] w-full object-contain"
-              />
-            )}
-
-          </div>
+            </div>
+          )}
 
 
           {/* MEDIA THUMBNAILS */}
@@ -93,7 +101,7 @@ function ReportModal({ report, onClose }) {
                   ${activeMedia === media ? "border-blue-500" : "border-gray-200"}`}
                 >
 
-                  {media.includes(".mp4") || media.includes(".mov") ? (
+                  {isVideo(media) ? (
                     <video
                       src={media}
                       className="w-full h-full object-cover"
@@ -117,53 +125,72 @@ function ReportModal({ report, onClose }) {
 
           <div className="grid md:grid-cols-2 gap-5 text-sm">
 
-            <div className="bg-gray-50 border rounded-xl p-5">
+<div className="grid grid-cols-3 sm:grid-cols-1 gap-4">
 
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
-                Report ID
-              </p>
+  {/* Name */}
+  <div>
+    <p className="text-xs text-gray-500">Resident Name</p>
+    <p className="text-gray-900 font-semibold">
+      {report.residentName
+        ?.replace(/\b\w/g, c => c.toUpperCase()) || "N/A"}
+    </p>
+  </div>
 
-              <p className="text-gray-900 font-semibold break-all">
-                {report.id}
-              </p>
+  {/* Email */}
+  <div>
+    <p className="text-xs text-gray-500">Email</p>
+    <p className="text-gray-900 font-semibold truncate">
+      {report.email || "No email"}
+    </p>
+  </div>
 
-            </div>
+  {/* Contact */}
+  <div>
+    <p className="text-xs text-gray-500">Contact Number</p>
+    <p className="text-gray-900 font-semibold">
+      {report.contact || "No contact"}
+    </p>
+  </div>
+
+</div>
 
 
-            <div className="bg-gray-50 border rounded-xl p-5">
+<div className="space-y-2">
 
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
                 Issue Type
               </p>
 
               <p className="text-gray-900 font-semibold">
-                {report.category}
+                {report.category || "N/A"}
               </p>
 
             </div>
 
 
-            <div className="bg-gray-50 border rounded-xl p-5">
+<div className="space-y-2">
 
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
                 Location
               </p>
 
               <p className="text-gray-900 leading-relaxed">
-                {report.location}
+                {report.location || "N/A"}
               </p>
 
             </div>
 
 
-            <div className="bg-gray-50 border rounded-xl p-5">
+<div className="space-y-2">
 
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
                 Date Reported
               </p>
 
               <p className="text-gray-900">
-                {report.reportedAt}
+                {report.createdAt?.toDate
+  ? report.createdAt.toDate().toLocaleString()
+  : new Date(report.createdAt).toLocaleString()}
               </p>
 
             </div>
@@ -173,7 +200,7 @@ function ReportModal({ report, onClose }) {
 
           {/* Description */}
 
-          <div className="bg-gray-50 border rounded-xl p-5">
+<div className="space-y-2">
 
             <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
               Description
@@ -188,78 +215,87 @@ function ReportModal({ report, onClose }) {
 
           {/* Barangay Update */}
 
-          {report.status === "ongoing" && (
-            <div className="bg-blue-50 border border-blue-100 p-5 rounded-xl">
+{report.status === "ongoing" && (
+  <div className="bg-blue-50 border border-blue-100 p-5 rounded-xl">
 
-              <h3 className="font-semibold text-blue-800 mb-1">
-                Barangay Update
-              </h3>
+    <h3 className="font-semibold text-blue-800 mb-1">
+      Barangay Update
+    </h3>
 
-              <p className="text-blue-700 text-sm">
-                {report.barangayUpdate || "Response team has been notified and is currently handling the situation."}
-              </p>
+    <p className="text-blue-700 text-sm">
+      {report.adminMessage
+        ? report.adminMessage
+        : "Response team has been notified and is currently handling the situation."
+      }
+    </p>
 
-            </div>
-          )}
+  </div>
+)}
 
 
           {/* Feedback Form */}
 
-          {report.status === "resolved" && (
+{report.status === "resolved" && (
 
-            <div className="border rounded-xl p-6">
+  <div className="bg-gray-50 border rounded-xl p-6">
 
-              <h3 className="font-semibold text-gray-800 mb-4">
-                Feedback Form
-              </h3>
+    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+      Feedback
+    </h3>
 
-              {[1,2,3,4,5,6,7].map((q) => (
+    <p className="text-sm text-gray-500 mb-6">
+      Please rate your experience with how this report was handled.
+    </p>
 
-                <div key={q} className="mb-4">
+    {[1,2,3,4,5,6,7].map((q) => (
 
-                  <p className="text-sm mb-1">
-                    Question {q}
-                  </p>
+      <div key={q} className="mb-5">
 
-                  <div className="flex gap-4">
+        <p className="text-sm font-medium text-gray-700 mb-2">
+          Question {q}
+        </p>
 
-                    {[1,2,3,4,5].map((rate) => (
+        <div className="flex gap-2">
 
-                      <label key={rate} className="flex items-center gap-1 text-sm">
+          {[1,2,3,4,5].map((rate) => (
 
-                        <input
-                          type="radio"
-                          name={`q${q}`}
-                          value={rate}
-                          onChange={handleChange}
-                        />
+            <button
+              key={rate}
+              type="button"
+              onClick={() => setFeedback({...feedback, [`q${q}`]: rate})}
+              className={`w-9 h-9 rounded-full border text-sm
+                ${feedback[`q${q}`] == rate
+                  ? "bg-[#007CCF] text-white border-[#007CCF]"
+                  : "bg-white text-gray-600 border-gray-300"
+                }`}
+            >
+              {rate}
+            </button>
 
-                        {rate}
+          ))}
 
-                      </label>
+        </div>
 
-                    ))}
+      </div>
 
-                  </div>
+    ))}
 
-                </div>
+    <div className="mt-4">
+      <textarea
+        name="comment"
+        placeholder="Write your feedback..."
+        onChange={handleChange}
+        className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#007CCF]"
+      />
+    </div>
 
-              ))}
+    <button className="mt-5 w-full bg-[#007CCF] text-white py-3 rounded-lg font-medium hover:bg-blue-700">
+      Submit Feedback
+    </button>
 
-              <textarea
-                name="comment"
-                placeholder="Overall comment..."
-                onChange={handleChange}
-                className="w-full border rounded-lg p-3 mt-3"
-              />
+  </div>
 
-              <button className="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                Submit Feedback
-              </button>
-
-            </div>
-
-          )}
+)}
 
         </div>
 

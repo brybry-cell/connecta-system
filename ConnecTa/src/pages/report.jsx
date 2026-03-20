@@ -1,14 +1,14 @@
 import Header from "../components/Header";
 import SideNav from "../components/navi";
 import Card from "../components/card";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import profile from "../assets/profile.png";
 import { uploadToCloudinary } from "../utils/cloudinary";
 
 function Report() {
 
   const [open, setOpen] = useState(false);
-
+const [categories, setCategories] = useState([]);
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
@@ -68,24 +68,50 @@ function Report() {
 
   /* ---------------- MEDIA CAPTURE ---------------- */
 
-  const handleMediaCapture = (event) => {
+const handleMediaCapture = (event) => {
+  const files = Array.from(event.target.files);
 
-    const files = Array.from(event.target.files);
+  if (mediaFiles.length + files.length > MAX_FILES) {
+    alert(`Maximum of ${MAX_FILES} files only.`);
+    return;
+  }
 
-    if (files.length > 0) {
-      setMediaFiles((prev) => [...prev, ...files]);
+  files.forEach(file => {
+    if (file.type.startsWith("video")) {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+
+      video.onloadedmetadata = () => {
+        if (video.duration > MAX_VIDEO_DURATION) {
+          alert("Video must be 30 seconds or less.");
+        } else {
+          setMediaFiles(prev => [...prev, file]);
+        }
+      };
+
+      video.src = URL.createObjectURL(file);
+    } else {
+      setMediaFiles(prev => [...prev, file]);
     }
+  });
 
-  };
+  // ✅ PUT IT HERE
+  event.target.value = null;
+};
 
   /* ---------------- SUBMIT REPORT ---------------- */
 
 const handleReport = async () => {
 
-  if (!category || !location || !description || mediaFiles.length === 0) {
-    alert("Please fill all fields and attach proof.");
-    return;
-  }
+if (!category) {
+  alert("Please select a category.");
+  return;
+}
+
+if (!location || !description || mediaFiles.length === 0) {
+  alert("Please fill all fields and attach proof.");
+  return;
+}
 
   try {
 
@@ -106,7 +132,7 @@ const handleReport = async () => {
 
     }
 
-    const response = await fetch("http://localhost:5000/report", {
+    const response = await fetch("https://connecta-backend-u4tw.onrender.com/report", {
 
       method: "POST",
 
@@ -155,6 +181,33 @@ const handleReport = async () => {
 
   };
 
+
+useEffect(() => {
+
+  const fetchCategories = async () => {
+    try {
+
+      setLoadingCategories(true);
+
+      const res = await fetch("https://connecta-backend-u4tw.onrender.com/admin/settings/report_categories");
+      const data = await res.json();
+
+      setCategories(data?.categories || []);
+
+    } catch (err) {
+      console.error(err);
+    }
+
+    setLoadingCategories(false);
+  };
+
+  fetchCategories();
+
+}, []);
+
+const MAX_FILES = 5;
+const MAX_VIDEO_DURATION = 30; // seconds
+const [loadingCategories, setLoadingCategories] = useState(true);
   return (
     <>
 
@@ -223,22 +276,23 @@ const handleReport = async () => {
                 Category
               </label>
 
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full h-11 rounded-lg border border-gray-300 px-4"
-              >
+<select
+  value={category}
+  onChange={(e) => setCategory(e.target.value)}
+  className="w-full h-11 rounded-lg border border-gray-300 px-4"
+>
 
-                <option>Select Category</option>
-                <option>Garbage Issue</option>
-                <option>Flooding</option>
-                <option>Illegal Dumping</option>
-                <option>Clogged Drainage</option>
-                <option>Noise Pollution</option>
-                <option>Air Pollution</option>
-                <option>Water Contamination</option>
+<option value="" disabled>
+  {loadingCategories ? "Loading..." : "Select Category"}
+</option>
 
-              </select>
+  {categories.map((cat, index) => (
+    <option key={index} value={cat}>
+      {cat}
+    </option>
+  ))}
+
+</select>
 
             </div>
 
@@ -250,8 +304,7 @@ const handleReport = async () => {
                 Location
               </label>
 
-              <div className="flex gap-2">
-
+<div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   value={location}
@@ -260,11 +313,11 @@ const handleReport = async () => {
                   className="flex-1 h-11 rounded-lg border border-gray-300 px-4"
                 />
 
-                <button
-                  type="button"
-                  onClick={handleGetLocation}
-                  className="px-4 h-11 bg-[#007CCF] text-white rounded-lg text-sm"
-                >
+<button
+  type="button"
+  onClick={handleGetLocation}
+  className="w-full sm:w-auto px-4 h-11 bg-[#007CCF] text-white rounded-lg text-sm"
+>
                   {loadingLocation ? "..." : "GPS"}
                 </button>
 
@@ -297,6 +350,7 @@ const handleReport = async () => {
                 type="file"
                 accept="image/*,video/*"
                 capture="environment"
+                multiple
                 onChange={handleMediaCapture}
                 className="hidden"
                 id="cameraInput"
@@ -304,29 +358,43 @@ const handleReport = async () => {
 
               <label
                 htmlFor="cameraInput"
-                className="flex-1 h-20 bg-gray-200 rounded-xl flex items-center justify-center text-3xl text-[#007CCF] cursor-pointer"
-              >
+className="w-full h-20 bg-gray-100 border-2 border-dashed border-[#007CCF] rounded-xl flex items-center justify-center text-3xl text-[#007CCF]"              >
                 +
               </label>
 
-              {mediaFiles.length > 0 && (
+{mediaFiles.length > 0 && (
+  <div className="grid grid-cols-3 gap-2 mt-3">
 
-                <div className="grid grid-cols-3 gap-2 mt-3">
+    {mediaFiles.map((file, index) => (
+      <div key={index} className="relative">
 
-                  {mediaFiles.map((file, index) => (
+        {file.type.startsWith("video") ? (
+          <video
+            src={URL.createObjectURL(file)}
+            className="w-full h-20 object-cover rounded-lg"
+          />
+        ) : (
+          <img
+            src={URL.createObjectURL(file)}
+            className="w-full h-20 object-cover rounded-lg"
+          />
+        )}
 
-                    <img
-                      key={index}
-                      src={URL.createObjectURL(file)}
-                      alt="preview"
-                      className="w-full h-20 object-cover rounded-lg"
-                    />
+        {/* REMOVE BUTTON */}
+        <button
+          onClick={() =>
+            setMediaFiles(prev => prev.filter((_, i) => i !== index))
+          }
+          className="absolute top-1 right-1 bg-black/70 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+        >
+          ✕
+        </button>
 
-                  ))}
+      </div>
+    ))}
 
-                </div>
-
-              )}
+  </div>
+)}
 
             </div>
 

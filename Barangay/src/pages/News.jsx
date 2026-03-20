@@ -27,6 +27,9 @@ const [editPostId,setEditPostId]=useState(null);
 const [scheduleDate,setScheduleDate]=useState("");
 const [scheduleTime,setScheduleTime]=useState("");
 
+/* LOADING STATE */
+const [loading,setLoading]=useState(false);
+
 /* LOAD POSTS */
 useEffect(()=>{
 fetchPosts();
@@ -36,7 +39,7 @@ const fetchPosts = async ()=>{
 
 try{
 
-const res = await fetch("http://localhost:5000/news");
+const res = await fetch("https://connecta-backend-u4tw.onrender.com/admin/news");
 const data = await res.json();
 
 setPosts(data);
@@ -87,7 +90,7 @@ const deletePost = async (row)=>{
 
 const post = posts[row[6].index];
 
-await fetch(`http://localhost:5000/admin/news/${post.id}`,{
+await fetch(`https://connecta-backend-u4tw.onrender.com/admin/news/${post.id}`,{
 method:"DELETE"
 });
 
@@ -120,6 +123,10 @@ return mediaUrls;
 /* PUBLISH POST */
 const publishPost = async ()=>{
 
+if(loading) return;
+
+setLoading(true);
+
 const adminUID = localStorage.getItem("adminUID");
 
 const mediaUrls = await uploadMediaFiles();
@@ -136,7 +143,7 @@ adminUID
 
 if(editPostId){
 
-await fetch(`http://localhost:5000/admin/news/${editPostId}`,{
+await fetch(`https://connecta-backend-u4tw.onrender.com/admin/news/${editPostId}`,{
 method:"PUT",
 headers:{ "Content-Type":"application/json" },
 body:JSON.stringify(postData)
@@ -144,7 +151,7 @@ body:JSON.stringify(postData)
 
 }else{
 
-await fetch("http://localhost:5000/admin/news",{
+await fetch("https://connecta-backend-u4tw.onrender.com/admin/news",{
 method:"POST",
 headers:{ "Content-Type":"application/json" },
 body:JSON.stringify(postData)
@@ -154,11 +161,16 @@ body:JSON.stringify(postData)
 
 clearForm();
 fetchPosts();
+setLoading(false);
 
 };
 
 /* SCHEDULE POST */
 const saveSchedule = async ()=>{
+
+if(loading) return;
+
+setLoading(true);
 
 const adminUID = localStorage.getItem("adminUID");
 
@@ -170,11 +182,11 @@ category,
 description,
 media:mediaUrls,
 status:"Scheduled",
-schedule:`${scheduleDate} ${scheduleTime}`,
+schedule: new Date(`${scheduleDate}T${scheduleTime}`),
 adminUID
 };
 
-await fetch("http://localhost:5000/admin/news",{
+await fetch("https://connecta-backend-u4tw.onrender.com/admin/news",{
 method:"POST",
 headers:{ "Content-Type":"application/json" },
 body:JSON.stringify(postData)
@@ -183,6 +195,7 @@ body:JSON.stringify(postData)
 clearForm();
 fetchPosts();
 setScheduleModal(false);
+setLoading(false);
 
 };
 
@@ -212,14 +225,40 @@ const columns=[
 "Action"
 ];
 
-const tableData=posts.map((p,i)=>[
-p.createdAt,
-p.category,
-p.title,
-p.status,
-p.postedBy,
-p.schedule,
-{ index:i }
+const [openDateFilter, setOpenDateFilter] = useState(false);
+
+const [dateRange, setDateRange] = useState({
+  from: "",
+  to: ""
+});
+
+
+const filteredPosts = posts.filter((p) => {
+
+  const matchSearch =
+    p.title.toLowerCase().includes(search.toLowerCase()) ||
+    p.category.toLowerCase().includes(search.toLowerCase());
+
+  const postDate = new Date(p.createdAt);
+  const from = dateRange.from ? new Date(dateRange.from) : null;
+  const to = dateRange.to ? new Date(dateRange.to) : null;
+
+  let matchDate = true;
+
+  if (from && postDate < from) matchDate = false;
+  if (to && postDate > to) matchDate = false;
+
+  return matchSearch && matchDate;
+});
+
+const tableData = filteredPosts.map((p,i)=>[
+  p.createdAt,
+  p.category,
+  p.title,
+  p.status,
+  p.postedBy,
+  p.schedule,
+  { index:i }
 ]);
 
 return(
@@ -229,14 +268,73 @@ return(
 
 <div className="md:ml-[260px] bg-gray-50 min-h-screen px-6 py-8">
 
-<h1 className="text-2xl font-bold text-[#007CCF] mb-6">
+<h1 className="text-3xl font-bold text-[#007CCF] mb-6">
 News Management
 </h1>
 
-<div className="flex justify-end mb-6">
-<Search value={search} onChange={(e)=>setSearch(e.target.value)}/>
-</div>
+<div className="grid lg:grid-cols-3 gap-6 mb-6">
 
+  {/* LEFT SPACE (same width as create post) */}
+  <div className="lg:col-span-2"></div>
+
+  {/* RIGHT SIDE (search aligned with recent posts) */}
+  <div className="relative w-full max-w-md">
+
+    <div
+      onClick={(e) => {
+        if (e.target.closest("svg")) {
+          setOpenDateFilter(prev => !prev);
+        }
+      }}
+    >
+      <Search
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+    </div>
+
+    {/* DROPDOWN */}
+    {openDateFilter && (
+      <div className="absolute right-0 mt-2 bg-white border rounded-lg shadow p-4 z-50 w-64">
+
+        <p className="text-sm font-semibold mb-2">Filter by Date</p>
+
+        <input
+          type="date"
+          value={dateRange.from}
+          onChange={(e)=>setDateRange({...dateRange, from: e.target.value})}
+          className="w-full border rounded px-2 py-1 mb-2"
+        />
+
+        <input
+          type="date"
+          value={dateRange.to}
+          onChange={(e)=>setDateRange({...dateRange, to: e.target.value})}
+          className="w-full border rounded px-2 py-1 mb-3"
+        />
+
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={()=>setOpenDateFilter(false)}
+            className="px-3 py-1 bg-gray-200 rounded text-sm"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={()=>setOpenDateFilter(false)}
+            className="px-3 py-1 bg-[#007CCF] text-white rounded text-sm"
+          >
+            Apply
+          </button>
+        </div>
+
+      </div>
+    )}
+
+  </div>
+
+</div>
 {/* MAIN GRID */}
 <div className="grid lg:grid-cols-3 gap-6 mb-10">
 
@@ -307,27 +405,7 @@ setDescription(html);
 }}
 />
 
-{/* TOOLBAR */}
-<div className="border-t flex gap-2 p-2 bg-gray-50 rounded-b-xl">
 
-<button
-type="button"
-onClick={()=>document.execCommand("bold",false,null)}
-className="px-3 py-1 text-sm font-bold hover:bg-gray-200 rounded"
->
-B
-</button>
-
-<button
-type="button"
-onClick={()=>document.execCommand("italic",false,null)}
-className="px-3 py-1 text-sm italic hover:bg-gray-200 rounded"
->
-I
-</button>
-
-
-</div>
 
 </div>
 
@@ -394,6 +472,7 @@ x
 
 <button
 onClick={()=>setScheduleModal(true)}
+disabled={loading}
 className="px-4 py-2 bg-yellow-500 text-white rounded-xl text-sm"
 >
 Schedule
@@ -401,9 +480,10 @@ Schedule
 
 <button
 onClick={publishPost}
+disabled={loading}
 className="px-4 py-2 bg-[#007CCF] text-white rounded-xl text-sm"
 >
-{editPostId ? "Update" : "Publish"}
+{loading ? "Posting..." : editPostId ? "Update" : "Publish"}
 </button>
 
 </div>
@@ -466,18 +546,23 @@ onRowClick={(row)=>setPreviewPost(posts[row[6].index])}
 
 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
 
-<div className="bg-white rounded-xl shadow-lg w-full max-w-xl p-6 relative">
+<div className="bg-white rounded-xl shadow-lg w-full max-w-xl p-6 relative max-h-[90vh] overflow-y-auto">
+<div className="flex justify-between items-center border-b pb-3 mb-4">
+  <h2 className="text-lg font-semibold text-black">
+    Post
+  </h2>
 
-<button
-onClick={()=>setPreviewPost(null)}
-className="absolute top-3 right-4 text-xl"
->
-✕
-</button>
+  <button
+    onClick={() => setPreviewPost(null)}
+    className="text-gray-500 hover:text-red-500 text-xl"
+  >
+    ✕
+  </button>
+</div>
 
 <img
-src={previewPost.media?.[0]}
-className="w-full rounded-lg mb-4"
+  src={previewPost.media?.[0]}
+  className="w-full max-h-[300px] object-contain rounded-lg mb-4"
 />
 
 <h2 className="font-semibold text-lg mb-2">
@@ -530,9 +615,10 @@ Cancel
 
 <button
 onClick={saveSchedule}
+disabled={loading}
 className="px-3 py-1 bg-[#007CCF] text-white rounded"
 >
-Save
+{loading ? "Saving..." : "Save"}
 </button>
 
 </div>

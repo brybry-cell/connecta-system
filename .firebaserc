@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "webconnecta-81bb3"
+  },
+  "targets": {
+    "webconnecta-81bb3": {
+      "hosting": {
+        "resident": [
+          "webconnecta-81bb3"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

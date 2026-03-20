@@ -55,7 +55,7 @@ function ReportCard({ report, onView }) {
           <span
             className={`px-2 py-1 text-xs rounded-full ${statusColor[report.status]}`}
           >
-            {report.status}
+            {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
           </span>
         </div>
 

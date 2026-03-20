@@ -50,6 +50,8 @@ const navItem = (name, path, defaultIcon, activeIcon) => {
   );
 };
 
+const user = JSON.parse(localStorage.getItem("user"));
+const permissions = user?.permissions || [];
 return (
   <>
     {/* MOBILE OVERLAY */}
@@ -92,12 +94,23 @@ return (
   />
 </div>
         <div className="flex flex-col mt-4">
-          {navItem("dashboard", "/dashboard", defdashboard, clickdashboard)}
-          {navItem("Reports", "/reports", defreports, clickreports)}
-          {navItem("News", "/news", defnews, clicknews)}
-          {navItem("Users", "/Users", defusers, clickusers)}
-          {navItem("settings", "/settings", defsettings, clicksettings)}
-          {navItem("System settings", "/systemsettings", defsystem, clicksystem)}
+          {permissions.includes("Dashboard") &&
+  navItem("dashboard", "/dashboard", defdashboard, clickdashboard)}
+
+{permissions.includes("Reports") &&
+  navItem("Reports", "/reports", defreports, clickreports)}
+
+{permissions.includes("News") &&
+  navItem("News", "/news", defnews, clicknews)}
+
+{permissions.includes("Users") &&
+  navItem("Users", "/Users", defusers, clickusers)}
+
+{permissions.includes("Settings") &&
+  navItem("settings", "/settings", defsettings, clicksettings)}
+
+{permissions.includes("Settings") &&
+  navItem("System settings", "/systemsettings", defsystem, clicksystem)}
 
         </div>
 
