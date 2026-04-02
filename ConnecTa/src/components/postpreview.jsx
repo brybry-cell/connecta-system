@@ -6,7 +6,6 @@ function PostPreview({ name, position, time, title, content, clickable }) {
       className={`
         w-full 
         mt-3
-        border border-[#007CCF]
         rounded-xl 
         p-4 sm:p-5
         bg-[#F5F5F5] 

@@ -39,18 +39,28 @@ const isVideo = (file) => {
 <div className="bg-white w-full max-w-4xl sm:rounded-2xl rounded-t-2xl h-full sm:h-auto max-h-[100vh] sm:max-h-[90vh] overflow-hidden shadow-xl">
 
         {/* Header */}
-<div className="flex items-center justify-between border-b px-4 sm:px-6 py-3">
-          <div className="flex flex-col">
-            <h2 className="text-xl font-bold text-gray-800">
-              Report Details
-            </h2>
+<div className="flex items-center justify-between px-4 sm:px-6 py-3">
+<div className="flex flex-col gap-1">
 
-            <div className="mt-2">
-              <span className={`text-xs px-3 py-1 rounded-full font-medium ${statusColor[report.status] || "bg-gray-100 text-gray-600"}`}>
-                {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
-              </span>
-            </div>
-          </div>
+  {/* TOP LINE */}
+  <div className="flex items-center gap-3">
+
+    <h1 className="text-lg sm:text-xl font-bold text-[#007CCF]">
+      Report Details
+    </h1>
+
+    <span className={`text-xs px-3 py-1 rounded-full font-medium ${statusColor[report.status] || "bg-gray-100 text-gray-600"}`}>
+      {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
+    </span>
+
+  </div>
+
+  {/* ISSUE TYPE UNDER */}
+  <p className="text-sm text-gray-500">
+    {report.category || "No category"}
+  </p>
+
+</div>
 
           <button
             onClick={onClose}
@@ -155,18 +165,6 @@ const isVideo = (file) => {
 </div>
 
 
-<div className="space-y-2">
-
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
-                Issue Type
-              </p>
-
-              <p className="text-gray-900 font-semibold">
-                {report.category || "N/A"}
-              </p>
-
-            </div>
-
 
 <div className="space-y-2">
 
@@ -216,7 +214,7 @@ const isVideo = (file) => {
           {/* Barangay Update */}
 
 {report.status === "ongoing" && (
-  <div className="bg-blue-50 border border-blue-100 p-5 rounded-xl">
+  <div className="bg-blue-50 border border-blue-100 p-5 rounded-xl mb-5">
 
     <h3 className="font-semibold text-blue-800 mb-1">
       Barangay Update
@@ -236,70 +234,39 @@ const isVideo = (file) => {
           {/* Feedback Form */}
 
 {report.status === "resolved" && (
+  <div className="bg-green-50 border border-green-100 p-5 rounded-xl">
 
-  <div className="bg-gray-50 border rounded-xl p-6">
-
-    <h3 className="text-lg font-semibold text-gray-800 mb-4">
-      Feedback
+    <h3 className="font-semibold text-green-800 mb-2">
+      Resolution Update
     </h3>
 
-    <p className="text-sm text-gray-500 mb-6">
-      Please rate your experience with how this report was handled.
+    <p className="text-green-700 text-sm mb-3">
+      {report.resolutionMessage || "No resolution message provided."}
     </p>
 
-    {[1,2,3,4,5,6,7].map((q) => (
+    {report.resolutionMedia && (
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        {(Array.isArray(report.resolutionMedia)
+          ? report.resolutionMedia
+          : [report.resolutionMedia]
+        ).map((media, index) => (
 
-      <div key={q} className="mb-5">
+          media.includes(".mp4") ? (
+            <video key={index} src={media} controls className="w-full h-32 object-cover rounded-lg" />
+          ) : (
+            <img key={index} src={media} className="w-full h-32 object-cover rounded-lg" />
+          )
 
-        <p className="text-sm font-medium text-gray-700 mb-2">
-          Question {q}
-        </p>
-
-        <div className="flex gap-2">
-
-          {[1,2,3,4,5].map((rate) => (
-
-            <button
-              key={rate}
-              type="button"
-              onClick={() => setFeedback({...feedback, [`q${q}`]: rate})}
-              className={`w-9 h-9 rounded-full border text-sm
-                ${feedback[`q${q}`] == rate
-                  ? "bg-[#007CCF] text-white border-[#007CCF]"
-                  : "bg-white text-gray-600 border-gray-300"
-                }`}
-            >
-              {rate}
-            </button>
-
-          ))}
-
-        </div>
-
+        ))}
       </div>
-
-    ))}
-
-    <div className="mt-4">
-      <textarea
-        name="comment"
-        placeholder="Write your feedback..."
-        onChange={handleChange}
-        className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#007CCF]"
-      />
-    </div>
-
-    <button className="mt-5 w-full bg-[#007CCF] text-white py-3 rounded-lg font-medium hover:bg-blue-700">
-      Submit Feedback
-    </button>
+    )}
 
   </div>
-
 )}
-
         </div>
 
       </div>
+
 
     </div>
 

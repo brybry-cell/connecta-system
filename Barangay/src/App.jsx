@@ -6,6 +6,7 @@ import SystemSettings from "./pages/SystemSettings";
 import User from "./pages/User";
 import Login from "./pages/Login"
 import {HashRouter as Router, Routes, Route} from "react-router-dom";
+import ForgotPassword from "./pages/ForgotPassword";
 
 function App() {
   return(
@@ -18,7 +19,7 @@ function App() {
         <Route path="/settings" element={<Settings />}/>
         <Route path="/systemsettings" element={<SystemSettings />}/>
         <Route path="/Users" element={<User />}/>
-
+        <Route path="/forgotpassword" element={<ForgotPassword/>} />
 
       </Routes>
     </Router>

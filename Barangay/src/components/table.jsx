@@ -1,3 +1,6 @@
+import editIcon from "../assets/edit.png";
+import deleteIcon from "../assets/delete.png";
+
 function Table({ columns, data, onView, onEdit, onDelete, onRowClick }) {
 
   return (
@@ -69,7 +72,12 @@ function Table({ columns, data, onView, onEdit, onDelete, onRowClick }) {
                                 onClick={() => onEdit(row)}
                                 className="px-3 py-1 text-xs bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200"
                               >
-                                Edit
+                                  <img
+    src={editIcon}
+    alt="edit"
+    onClick={() => onEdit(row)}
+    className="w-5 h-5 cursor-pointer opacity-70 hover:opacity-100 hover:scale-110 transition"
+  />
                               </button>
                             )}
 
@@ -78,7 +86,12 @@ function Table({ columns, data, onView, onEdit, onDelete, onRowClick }) {
                                 onClick={() => onDelete(row)}
                                 className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded-md hover:bg-red-200"
                               >
-                                Delete
+                                <img
+    src={deleteIcon}
+    alt="delete"
+    onClick={() => onDelete(row)}
+    className="w-5 h-5 cursor-pointer opacity-70 hover:opacity-100 hover:scale-110 transition"
+  />
                               </button>
                             )}
 

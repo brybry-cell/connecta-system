@@ -4,6 +4,8 @@ import SideNav from "../components/navi";
 import Table from "../components/table";
 import Modal from "../components/modal";
 import Search from "../components/search";
+import arrowleft from "../assets/arrowleft.png";
+import arrowright from "../assets/arrowright.png";
 
 function Reports() {
 
@@ -17,6 +19,7 @@ function Reports() {
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("overall");
 
   const [reports, setReports] = useState([]);
   const [myCases, setMyCases] = useState([]);
@@ -26,54 +29,96 @@ function Reports() {
 
   const [reviewMessage, setReviewMessage] = useState("");
   const [resolveMessage, setResolveMessage] = useState("");
+  const [ongoingMessage, setOngoingMessage] = useState("");
   const [files, setFiles] = useState([]);
 
-  const adminId = localStorage.getItem("adminUID");
+  const adminId = localStorage.getItem("uid");
+
+  // Loading States
+  const [loadingReports, setLoadingReports] = useState(true);
+  const [loadingMyCases, setLoadingMyCases] = useState(true);
+  const [assigningReport, setAssigningReport] = useState(false);
+  const [sendingReview, setSendingReview] = useState(false);
+  const [sendingOngoing, setSendingOngoing] = useState(false);
+  const [resolvingReport, setResolvingReport] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+
+  // Error States
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const API_URL = "https://connecta-backend-u4tw.onrender.com";
 
   /* FETCH ALL REPORTS */
   const fetchReports = async () => {
-
-const res = await fetch(`https://connecta-backend-u4tw.onrender.com/admin/reports?search=${search}&adminId=${adminId}`);
-    const data = await res.json();
-
-    const sorted = data.sort((a, b) => {
-  return new Date(b.reportedAt) - new Date(a.reportedAt);
-});
-
-setReports(sorted);
-
+    setLoadingReports(true);
+    setError("");
+    
+    try {
+      const res = await fetch(`${API_URL}/admin/reports?search=${search}&adminId=${adminId}`);
+      
+      if (!res.ok) {
+        throw new Error(`Failed to fetch reports: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      const sorted = data.sort((a, b) => {
+        return new Date(b.reportedAt) - new Date(a.reportedAt);
+      });
+      
+      setReports(sorted);
+    } catch (err) {
+      console.error("Error fetching reports:", err);
+      setError("Failed to load reports. Please refresh the page.");
+    } finally {
+      setLoadingReports(false);
+    }
   };
 
   /* FETCH MY CASES */
   const fetchMyCases = async () => {
-
-    if (!adminId) return;
-
-    const res = await fetch(`https://connecta-backend-u4tw.onrender.com/admin/my-cases/${adminId}`);
-    const data = await res.json();
-
-const statusPriority = {
-  reviewing: 1,
-  ongoing: 2,
-  resolved: 3
-};
-
-const sorted = data.sort((a, b) => {
-
-  // 🔥 PRIORITY SORT FIRST
-  const priorityA = statusPriority[a.status] || 99;
-  const priorityB = statusPriority[b.status] || 99;
-
-  if (priorityA !== priorityB) {
-    return priorityA - priorityB;
-  }
-
-  // 🔥 THEN SORT BY NEWEST
-  return b.createdAt - a.createdAt;
-
-});
-
-setMyCases(sorted);
+    if (!adminId) {
+      setLoadingMyCases(false);
+      return;
+    }
+    
+    setLoadingMyCases(true);
+    setError("");
+    
+    try {
+      const res = await fetch(`${API_URL}/admin/my-cases/${adminId}`);
+      
+      if (!res.ok) {
+        throw new Error(`Failed to fetch cases: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      const statusPriority = {
+        reviewing: 1,
+        ongoing: 2,
+        resolved: 3
+      };
+      
+      const sorted = data.sort((a, b) => {
+        const priorityA = statusPriority[a.status] || 99;
+        const priorityB = statusPriority[b.status] || 99;
+        
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        
+        return b.createdAt - a.createdAt;
+      });
+      
+      setMyCases(sorted);
+    } catch (err) {
+      console.error("Error fetching my cases:", err);
+      setError("Failed to load your cases.");
+    } finally {
+      setLoadingMyCases(false);
+    }
   };
 
   useEffect(() => {
@@ -84,223 +129,337 @@ setMyCases(sorted);
     fetchMyCases();
   }, []);
 
-
-
-const handleview = async (report) => {
-
-  // ✅ assign first
-  await fetch(`https://connecta-backend-u4tw.onrender.com/admin/assign-report/${report.id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ adminId }),
-  });
-
-  // ✅ then GET updated my-cases (with assignedName)
-  const res = await fetch(
-    `https://connecta-backend-u4tw.onrender.com/admin/my-cases/${adminId}`
-  );
-
-  const updated = await res.json();
-
-  const latest = updated.find(r => r.id === report.id);
-
-  // ✅ THIS IS THE KEY
-  setSelectedReport(latest);
-
-  setIsModalOpen(true);
-
-  fetchReports();   // refresh overall (it will disappear)
-  fetchMyCases();   // refresh my cases
-};
-
-  /* SEND REVIEW MESSAGE */
-  const sendReview = async () => {
-
-    await fetch(`https://connecta-backend-u4tw.onrender.com/admin/review-report/${selectedReport.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: reviewMessage,
-      }),
-    });
-
-    setReviewMessage("");
-
-    fetchReports();
-    fetchMyCases();
-
-    setIsModalOpen(false);
-  };
-
-  /* RESOLVE REPORT */
-  const resolveReport = async () => {
-
-    const media = [];
-
-    for (let file of files) {
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("upload_preset", "connecta_upload");
-
-      const res = await fetch(
-        "https://api.cloudinary.com/v1_1/djh0ademo/image/upload",
+  const handleview = async (report) => {
+    if (assigningReport) return;
+    
+    setAssigningReport(true);
+    setError("");
+    
+    try {
+      const resAssign = await fetch(
+        `${API_URL}/admin/assign-report/${report.id}`,
         {
-          method: "POST",
-          body: formData,
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ adminId }),
         }
       );
-
-      const data = await res.json();
-
-      media.push(data.secure_url);
+      
+      if (!resAssign.ok) {
+        throw new Error("Failed to assign report");
+      }
+      
+      const assignData = await resAssign.json();
+      console.log("ASSIGN RESPONSE:", assignData);
+      
+      const check = await fetch(
+        `${API_URL}/admin/my-cases/${adminId}`
+      );
+      
+      if (!check.ok) {
+        throw new Error("Failed to fetch updated cases");
+      }
+      
+      const checkData = await check.json();
+      const latest = checkData.find(r => r.id === report.id);
+      
+      setSelectedReport(latest);
+      setIsModalOpen(true);
+      
+      await fetchReports();
+      await fetchMyCases();
+      
+      setSuccessMessage("Report assigned successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+      
+    } catch (err) {
+      console.error("Error assigning report:", err);
+      setError("Failed to assign report. Please try again.");
+    } finally {
+      setAssigningReport(false);
     }
+  };
 
-    await fetch(`https://connecta-backend-u4tw.onrender.com/admin/resolve-report/${selectedReport.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: resolveMessage,
-        media,
-      }),
-    });
+  /* SEND REVIEW MESSAGE - NO EMAIL */
+  const sendReview = async () => {
+    if (!reviewMessage.trim()) {
+      setError("Please enter a message before sending.");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+    
+    setSendingReview(true);
+    setError("");
+    
+    try {
+      const res = await fetch(`${API_URL}/admin/review-report/${selectedReport.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: reviewMessage,
+        }),
+      });
+      
+      const responseData = await res.json();
+      console.log("Review response:", responseData);
+      
+      if (!res.ok) {
+        throw new Error(responseData.error || "Failed to send review");
+      }
+      
+      setReviewMessage("");
+      await fetchReports();
+      await fetchMyCases();
+      
+      const updatedRes = await fetch(
+        `${API_URL}/admin/my-cases/${adminId}`
+      );
+      const updatedData = await updatedRes.json();
+      const latest = updatedData.find(r => r.id === selectedReport.id);
+      setSelectedReport(latest);
+      
+      setSuccessMessage("Review sent successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+      
+    } catch (err) {
+      console.error("Error sending review:", err);
+      setError("Failed to send review. Please try again.");
+      setTimeout(() => setError(""), 3000);
+    } finally {
+      setSendingReview(false);
+    }
+  };
 
-    setResolveMessage("");
-    setFiles([]);
+  /* SEND ONGOING UPDATE - NO EMAIL */
+  const sendOngoingUpdate = async () => {
+    if (!ongoingMessage.trim()) {
+      setError("Please enter a message before sending.");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+    
+    if (files.length > 0) {
+      setError("Media is only allowed for resolved reports. Please remove media to send ongoing update.");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+    
+    setSendingOngoing(true);
+    setError("");
+    
+    try {
+      const res = await fetch(`${API_URL}/admin/update-ongoing/${selectedReport.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: ongoingMessage,
+        }),
+      });
+      
+      const responseData = await res.json();
+      console.log("Ongoing update response:", responseData);
+      
+      if (!res.ok) {
+        throw new Error(responseData.error || "Failed to send update");
+      }
+      
+      const updatedRes = await fetch(
+        `${API_URL}/admin/my-cases/${adminId}`
+      );
+      
+      const updatedData = await updatedRes.json();
+      const latest = updatedData.find(r => r.id === selectedReport.id);
+      setSelectedReport(latest);
+      
+      setOngoingMessage("");
+      await fetchReports();
+      await fetchMyCases();
+      
+      setSuccessMessage("Update sent successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+      
+    } catch (err) {
+      console.error("Error sending ongoing update:", err);
+      setError("Failed to send update. Please try again.");
+      setTimeout(() => setError(""), 3000);
+    } finally {
+      setSendingOngoing(false);
+    }
+  };
 
-    fetchReports();
-    fetchMyCases();
-
-    setIsModalOpen(false);
+  /* RESOLVE REPORT - NO EMAIL */
+  const resolveReport = async () => {
+    if (!resolveMessage.trim()) {
+      setError("Please enter a resolution message before resolving.");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+    
+    setResolvingReport(true);
+    setError("");
+    
+    try {
+      const media = [];
+      
+      if (files.length > 0) {
+        setUploadingFiles(true);
+        
+        for (let file of files) {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("upload_preset", "connecta_upload");
+          
+          const res = await fetch(
+            "https://api.cloudinary.com/v1_1/djh0ademo/image/upload",
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+          
+          if (!res.ok) {
+            throw new Error("Failed to upload file to Cloudinary");
+          }
+          
+          const data = await res.json();
+          media.push(data.secure_url);
+        }
+        
+        setUploadingFiles(false);
+      }
+      
+      const res = await fetch(`${API_URL}/admin/resolve-report/${selectedReport.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: resolveMessage,
+          media,
+        }),
+      });
+      
+      const responseData = await res.json();
+      console.log("Resolve response:", responseData);
+      
+      if (!res.ok) {
+        throw new Error(responseData.error || "Failed to resolve report");
+      }
+      
+      setResolveMessage("");
+      setFiles([]);
+      await fetchReports();
+      await fetchMyCases();
+      setIsModalOpen(false);
+      
+      setSuccessMessage("Report resolved successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+      
+    } catch (err) {
+      console.error("Error resolving report:", err);
+      setError(err.message || "Failed to resolve report. Please try again.");
+      setTimeout(() => setError(""), 3000);
+    } finally {
+      setResolvingReport(false);
+      setUploadingFiles(false);
+    }
   };
 
   /* FORMAT TABLE DATA */
-const [statusFilter, setStatusFilter] = useState("all");
-
-
+  const [statusFilter, setStatusFilter] = useState("all");
   const [pageOverall, setPageOverall] = useState(1);
-const [pageMyCase, setPageMyCase] = useState(1);
+  const [pageMyCase, setPageMyCase] = useState(1);
 
-const perPage = 10;
+  const perPage = 10;
 
-const paginate = (data, page) => {
-  const start = (page - 1) * perPage;
-  return data.slice(start, start + perPage);
-};
+  const paginate = (data, page) => {
+    const start = (page - 1) * perPage;
+    return data.slice(start, start + perPage);
+  };
 
-const totalPages = (data) => Math.max(1, Math.ceil(data.length / perPage));
+  const totalPages = (data) => Math.max(1, Math.ceil(data.length / perPage));
 
-const myCaseTable = paginate(
-  myCases
-  .filter((r) => statusFilter === "all" || r.status === statusFilter)
-  .map((r) => ([
-<span className="font-bold">
-  {r.residentName
-    .split(" ")
-    .map(name => name.charAt(0).toUpperCase() + name.slice(1))
-    .join(" ")
-  }
-</span>,
-    r.category,
-<span className={`px-2 py-1 rounded text-xs font-semibold
-${r.status === "pending" && "bg-yellow-100 text-yellow-700"}
-${r.status === "reviewing" && "bg-blue-100 text-blue-700"}
-${r.status === "ongoing" && "bg-orange-100 text-orange-700"}
-${r.status === "resolved" && "bg-green-100 text-green-700"}
-`}>
-  {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
-</span>,
-    r.description,
-    r
-  ])),
-  pageMyCase
-);
+  const filteredOverallReports = reports.filter((r) => r.status === "pending" && !r.assignedTo);
+  const filteredMyCases = myCases.filter((r) => statusFilter === "all" || r.status === statusFilter);
 
-const overallTable = paginate(
-  reports
-    .filter((r) => r.status === "pending") // 🔥 ONLY PENDING
-    .filter((r) => !r.assignedTo) // 🔥 NOT ASSIGNED
-    .map((r) => ([
-<span className="font-bold">
-  {r.residentName
-    .split(" ")
-    .map(name => name.charAt(0).toUpperCase() + name.slice(1))
-    .join(" ")
-  }
-</span>,
+  const myCaseTable = paginate(
+    filteredMyCases.map((r) => ([
+      <span className="font-bold" key={`name-${r.id}`}>
+        {r.residentName
+          .split(" ")
+          .map(name => name.charAt(0).toUpperCase() + name.slice(1))
+          .join(" ")
+        }
+      </span>,
       r.category,
-<span className={`px-2 py-1 rounded text-xs font-semibold
-${r.status === "pending" && "bg-yellow-100 text-yellow-700"}
-${r.status === "reviewing" && "bg-blue-100 text-blue-700"}
-${r.status === "ongoing" && "bg-orange-100 text-orange-700"}
-${r.status === "resolved" && "bg-green-100 text-green-700"}
-`}>
-  {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
-</span>,      
-r.description,
+      <span key={`status-${r.id}`} className={`px-2 py-1 rounded text-xs font-semibold
+        ${r.status === "pending" && "bg-yellow-100 text-yellow-700"}
+        ${r.status === "reviewing" && "bg-blue-100 text-blue-700"}
+        ${r.status === "ongoing" && "bg-orange-100 text-orange-700"}
+        ${r.status === "resolved" && "bg-green-100 text-green-700"}
+      `}>
+        {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+      </span>,
+      <span key={`desc-${r.id}`} className="max-w-[200px] truncate block">
+        {r.description}
+      </span>,
       r
     ])),
-  pageOverall
-);
-
-const [ongoingMessage, setOngoingMessage] = useState("");
-const sendOngoingUpdate = async () => {
-
-  if (!ongoingMessage.trim()) {
-    alert("Message cannot be empty");
-    return;
-  }
-
-  if (files.length > 0) {
-    alert("Please remove media. Media is only allowed for resolved reports.");
-    return;
-  }
-
-  console.log("Sending message:", ongoingMessage);
-  console.log("Report ID:", selectedReport.id);
-
-  const res = await fetch(`https://connecta-backend-u4tw.onrender.com/admin/update-ongoing/${selectedReport.id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      message: ongoingMessage,
-    }),
-  });
-
-  const data = await res.json();
-
-  console.log("Server response:", data);
-
-  if (!res.ok) {
-    alert("Update failed");
-    return;
-  }
-
-  // 🔥 REFETCH UPDATED REPORT (IMPORTANT)
-  const updatedRes = await fetch(
-    `https://connecta-backend-u4tw.onrender.com/admin/my-cases/${adminId}`
+    pageMyCase
   );
 
-  const updatedData = await updatedRes.json();
+  const overallTable = paginate(
+    filteredOverallReports.map((r) => ([
+      <span key={`name-${r.id}`} className="font-bold">
+        {r.residentName
+          .split(" ")
+          .map(name => name.charAt(0).toUpperCase() + name.slice(1))
+          .join(" ")
+        }
+      </span>,
+      r.category,
+      <span key={`status-${r.id}`} className={`px-2 py-1 rounded text-xs font-semibold
+        ${r.status === "pending" && "bg-yellow-100 text-yellow-700"}
+        ${r.status === "reviewing" && "bg-blue-100 text-blue-700"}
+        ${r.status === "ongoing" && "bg-orange-100 text-orange-700"}
+        ${r.status === "resolved" && "bg-green-100 text-green-700"}
+      `}>
+        {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+      </span>,
+      r.description,
+      r
+    ])),
+    pageOverall
+  );
 
-  const latest = updatedData.find(r => r.id === selectedReport.id);
+  const handleFileChange = (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    const validFiles = selectedFiles.filter(file => 
+      file.type.startsWith('image/') || file.type.startsWith('video/')
+    );
+    
+    if (validFiles.length !== selectedFiles.length) {
+      setError("Only image and video files are allowed");
+      setTimeout(() => setError(""), 3000);
+    }
+    
+    if (files.length + validFiles.length > 5) {
+      setError("Maximum 5 files allowed");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+    
+    setFiles([...files, ...validFiles]);
+  };
 
-  setSelectedReport(latest); // ✅ update modal data
+  const removeFile = (index) => {
+    setFiles(files.filter((_, i) => i !== index));
+  };
 
-  setOngoingMessage("");
-
-  fetchReports();
-  fetchMyCases();
-
-  // OPTIONAL: keep modal open to see live change
-  // setIsModalOpen(false);
-};
   return (
     <>
       <Header />
@@ -308,7 +467,6 @@ const sendOngoingUpdate = async () => {
 
       <div className="md:ml-[260px] bg-gray-50 min-h-screen px-6 py-8">
 
-        {/* MOBILE MENU */}
         <div className="md:hidden mb-4">
           <button
             onClick={() => setOpen(true)}
@@ -318,358 +476,415 @@ const sendOngoingUpdate = async () => {
           </button>
         </div>
 
-        {/* TITLE */}
         <h1 className="text-3xl font-bold text-[#007CCF] mb-6">
           Reports Management
         </h1>
 
-        {/* SEARCH */}
+        {successMessage && (
+          <div className="mb-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-700 text-sm text-center animate-fadeIn">
+            {successMessage}
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-700 text-sm text-center animate-shake">
+            {error}
+          </div>
+        )}
+
+        <div className="border-b border-gray-200 mb-6">
+          <div className="flex gap-6">
+            <button
+              onClick={() => {
+                setActiveTab("overall");
+                setPageOverall(1);
+              }}
+              className={`pb-3 px-2 text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                activeTab === "overall"
+                  ? "text-[#007CCF] border-b-2 border-[#007CCF]"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Overall Reports
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                activeTab === "overall"
+                  ? "bg-[#007CCF]/10 text-[#007CCF]"
+                  : "bg-gray-100 text-gray-600"
+              }`}>
+                {filteredOverallReports.length}
+              </span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("mycase");
+                setPageMyCase(1);
+              }}
+              className={`pb-3 px-2 text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                activeTab === "mycase"
+                  ? "text-[#007CCF] border-b-2 border-[#007CCF]"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              My Cases
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                activeTab === "mycase"
+                  ? "bg-[#007CCF]/10 text-[#007CCF]"
+                  : "bg-gray-100 text-gray-600"
+              }`}>
+                {filteredMyCases.length}
+              </span>
+            </button>
+          </div>
+        </div>
+
         <div className="flex justify-end mb-6">
-<Search
-  value={search}
-  onChange={(e) => setSearch(e.target.value)}
-  onFilter={(status) => setStatusFilter(status)}
-  filterOptions={["all", "pending", "reviewing", "ongoing", "resolved"]}
-
-/>
-        </div>
-
-        {/* OVERALL REPORTS */}
-        <div className="mb-12">
-
-          <h2 className="text-lg font-semibold mb-2 text-gray-700">
-            Overall Reports
-          </h2>
-
-          <Table
-            columns={columns}
-            data={overallTable}
-            onView={(row) => handleview(row[4])}
+          <Search
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onFilter={(status) => setStatusFilter(status)}
+            filterOptions={["all", "pending", "reviewing", "ongoing", "resolved"]}
           />
-
-<div className="flex justify-center items-center gap-3 mt-4">
-  <button
-    className="bg-blue-600 text-white px-4 py-1 rounded-lg disabled:opacity-50"
-    onClick={() => setPageOverall(p => p - 1)}
-    disabled={pageOverall === 1}
-  >
-    Prev
-  </button>
-
-  <span className="text-sm font-medium">
-    Page {pageOverall} of {totalPages(
-  reports.filter(r => r.status === "pending" && !r.assignedTo)
-)}
-  </span>
-
-  <button
-    className="bg-blue-600 text-white px-4 py-1 rounded-lg disabled:opacity-50"
-    onClick={() => setPageOverall(p => p + 1)}
-    disabled={pageOverall === totalPages(reports.filter(r => !r.assignedTo))}
-  >
-    Next
-  </button>
-</div>
         </div>
 
-        {/* MY CASE */}
-        <div>
+        {activeTab === "overall" && (
+          <div>
+            {loadingReports ? (
+              <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#007CCF]"></div>
+                <p className="text-gray-500 mt-2">Loading reports...</p>
+              </div>
+            ) : (
+              <>
+                {filteredOverallReports.length === 0 ? (
+                  <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-8 text-center">
+                    <p className="text-gray-500">No pending reports available</p>
+                  </div>
+                ) : (
+                  <>
+                    <Table
+                      columns={columns}
+                      data={overallTable}
+                      onView={(row) => handleview(row[4])}
+                      viewLoading={assigningReport}
+                    />
 
-          <h2 className="text-lg font-semibold mb-2 text-gray-700">
-            My Case
-          </h2>
+                    <div className="flex justify-center items-center gap-4 mt-4">
+                      <button
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        onClick={() => setPageOverall(p => p - 1)}
+                        disabled={pageOverall === 1 || loadingReports}
+                      >
+                        <img src={arrowleft} alt="Previous" className="w-6 h-6" />
+                      </button>
 
-          <Table
-            columns={columns}
-            data={myCaseTable}
-onView={async (row) => {
-  const report = row[4];
+                      <span className="text-sm font-medium text-gray-600">
+                        Page {pageOverall} of {totalPages(filteredOverallReports)}
+                      </span>
 
-  const res = await fetch(`https://connecta-backend-u4tw.onrender.com/admin/my-cases/${adminId}`);
-  const updated = await res.json();
+                      <button
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        onClick={() => setPageOverall(p => p + 1)}
+                        disabled={pageOverall === totalPages(filteredOverallReports) || loadingReports}
+                      >
+                        <img src={arrowright} alt="Next" className="w-6 h-6" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
-  const latest = updated.find(r => r.id === report.id);
+        {activeTab === "mycase" && (
+          <div>
+            {loadingMyCases ? (
+              <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#007CCF]"></div>
+                <p className="text-gray-500 mt-2">Loading your cases...</p>
+              </div>
+            ) : (
+              <>
+                {filteredMyCases.length === 0 ? (
+                  <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-8 text-center">
+                    <p className="text-gray-500">No cases assigned to you</p>
+                  </div>
+                ) : (
+                  <>
+                    <Table
+                      columns={columns}
+                      data={myCaseTable}
+                      onView={async (row) => {
+                        const report = row[4];
+                        const res = await fetch(`${API_URL}/admin/my-cases/${adminId}`);
+                        const updated = await res.json();
+                        const latest = updated.find(r => r.id === report.id);
+                        setSelectedReport(latest);
+                        setIsModalOpen(true);
+                      }}
+                    />
 
-  setSelectedReport(latest); // ✅ HAS assignedName
-  setIsModalOpen(true);
-}}
-          />
+                    <div className="flex justify-center items-center gap-4 mt-4">
+                      <button
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        onClick={() => setPageMyCase(p => p - 1)}
+                        disabled={pageMyCase === 1 || loadingMyCases}
+                      >
+                        <img src={arrowleft} alt="Previous" className="w-6 h-6" />
+                      </button>
 
-          <div className="flex justify-center items-center gap-3 mt-4">
-  <button
-    className="bg-blue-600 text-white px-4 py-1 rounded-lg disabled:opacity-50"
-    onClick={() => setPageMyCase(p => p - 1)}
-    disabled={pageMyCase === 1}
-  >
-    Prev
-  </button>
+                      <span className="text-sm font-medium text-gray-600">
+                        Page {pageMyCase} of {totalPages(filteredMyCases)}
+                      </span>
 
-  <span className="text-sm font-medium">
-    Page {pageMyCase} of {totalPages(myCases)}
-  </span>
-
-  <button
-    className="bg-blue-600 text-white px-4 py-1 rounded-lg disabled:opacity-50"
-    onClick={() => setPageMyCase(p => p + 1)}
-    disabled={pageMyCase === totalPages(myCases)}
-  >
-    Next
-  </button>
-</div>
-
-        </div>
+                      <button
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        onClick={() => setPageMyCase(p => p + 1)}
+                        disabled={pageMyCase === totalPages(filteredMyCases) || loadingMyCases}
+                      >
+                        <img src={arrowright} alt="Next" className="w-6 h-6" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
       </div>
 
       {/* MODAL */}
-{/* MODAL */}
-<Modal
-  isOpen={isModalOpen}
-  onClose={() => setIsModalOpen(false)}
-  title="Report Details"
->
-
-{selectedReport && (
-
-<div className="space-y-6">
-
-{/* MEDIA SECTION */}
-<div>
-
-<h3 className="text-sm font-semibold text-gray-600 mb-2">
-Evidence Media
-</h3>
-
-<div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-
-{(() => {
-
-const media = selectedReport.proofofReport;
-if (!media) return null;
-
-const mediaList = Array.isArray(media) ? media : [media];
-
-return mediaList.map((url, i) => (
-
-url?.includes(".mp4") ?
-
-<video
-key={i}
-src={url}
-controls
-className="w-full max-h-[250px] object-contain bg-black rounded-lg"/>
-
-:
-
-<img
-key={i}
-src={url}
-className="w-full max-h-[250px] object-contain bg-black rounded-lg"/>
-
-));
-
-})()}
-
-</div>
-
-</div>
-
-
-{/* REPORT INFORMATION */}
-<div className="bg-gray-50 rounded-lg p-4 border">
-
-  <h3 className="text-sm font-semibold text-gray-600 mb-3">
-    Report Information
-  </h3>
-
-  <div className="space-y-4 text-sm">
-
-    {/* DATE */}
-    <p className="font-semibold text-gray-800">
-      {new Date(selectedReport.createdAt).toLocaleString()}
-    </p>
-
-    {/* ISSUE + STATUS */}
-    <div className="grid grid-cols-2 gap-4">
-      <p>
-        <span className="text-gray-500">Issue Type: </span>
-        <span className="font-semibold">{selectedReport.category}</span>
-      </p>
-
-      <p>
-        <span className="text-gray-500">Status: </span>
-        <span className={`px-2 py-1 rounded text-xs font-semibold
-          ${selectedReport.status === "pending" && "bg-yellow-100 text-yellow-700"}
-          ${selectedReport.status === "reviewing" && "bg-blue-100 text-blue-700"}
-          ${selectedReport.status === "ongoing" && "bg-orange-100 text-orange-700"}
-          ${selectedReport.status === "resolved" && "bg-green-100 text-green-700"}
-        `}>
-          {selectedReport.status}
-        </span>
-      </p>
-    </div>
-
-    {/* NAME + EMAIL */}
-    <div className="grid grid-cols-2 gap-4">
-      <p>
-        <span className="text-gray-500">Name: </span>
-        <span className="font-semibold">
-          {selectedReport.residentName
-            ?.replace(/\b\w/g, c => c.toUpperCase())}
-        </span>
-      </p>
-
-      <p>
-        <span className="text-gray-500">Email: </span>
-        <span className="font-semibold">{selectedReport.email}</span>
-      </p>
-    </div>
-
-    {/* CONTACT */}
-    <p>
-      <span className="text-gray-500">Contact Number: </span>
-      <span className="font-semibold">{selectedReport.contact}</span>
-    </p>
-
-    {/* ASSIGNED TO */}
-    <p>
-      <span className="text-gray-500">Assigned To: </span>
-     <span className="font-semibold">
-  {selectedReport.assignedName
-    ? selectedReport.assignedName
-        .replace(/\b\w/g, c => c.toUpperCase())
-    : "Not assigned"}
-</span>
-    </p>
-
-    {/* DESCRIPTION */}
-    <p>
-      <span className="text-gray-500">Description: </span>
-      <span>{selectedReport.description}</span>
-    </p>
-
-  </div>
-
-</div>
-
-{/* REVIEWING SECTION */}
-{selectedReport.status === "reviewing" && (
-
-<div className="space-y-3">
-
-<h3 className="text-sm font-semibold text-gray-600">
-Send Update to Resident
-</h3>
-
-<textarea
-className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-placeholder="Write a message to the resident..."
-rows="3"
-value={reviewMessage}
-onChange={(e) => setReviewMessage(e.target.value)}
-/>
-
-<div className="flex justify-end">
-
-<button
-onClick={sendReview}
-className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm shadow"
->
-Send Update
-</button>
-
-</div>
-
-</div>
-
-)}
-
-
-{/* ONGOING SECTION */}
-{selectedReport.status === "ongoing" && (
-
-<div className="space-y-6">
-
-  {/* ================= Ongoing Update ================= */}
-  <div className="space-y-3">
-
-    <h3 className="text-sm font-semibold text-gray-600">
-      Ongoing Update
-    </h3>
-
-    <textarea
-      className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-      placeholder="Write update for the resident..."
-      rows="3"
-      value={ongoingMessage}
-      onChange={(e) => setOngoingMessage(e.target.value)}
-    />
-
-    <p className="text-xs text-gray-500">
-      Note: Media upload is only allowed when resolving the report.
-    </p>
-
-    <div className="flex justify-end">
-      <button
-        onClick={sendOngoingUpdate}
-        className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2 rounded-lg text-sm shadow"
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Report Details"
       >
-        Send Update
-      </button>
-    </div>
+        {selectedReport && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">
+                Evidence Media
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {(() => {
+                  const media = selectedReport.proofofReport;
+                  if (!media) return null;
+                  
+                  const mediaList = Array.isArray(media) ? media : [media];
+                  
+                  return mediaList.map((url, i) => (
+                    url?.includes(".mp4") ?
+                      <video
+                        key={i}
+                        src={url}
+                        controls
+                        className="w-full max-h-[250px] object-contain bg-black rounded-lg"
+                      />
+                      :
+                      <img
+                        key={i}
+                        src={url}
+                        alt={`Evidence ${i + 1}`}
+                        className="w-full max-h-[250px] object-contain bg-black rounded-lg"
+                      />
+                  ));
+                })()}
+              </div>
+            </div>
 
-  </div>
+            <div className="bg-white rounded-2xl shadow-md p-5">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="text-xs text-gray-500">Issue Type</p>
+                  <p className="font-semibold text-gray-800">
+                    {selectedReport.category}
+                  </p>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold
+                  ${selectedReport.status === "pending" && "bg-yellow-100 text-yellow-700"}
+                  ${selectedReport.status === "reviewing" && "bg-blue-100 text-blue-700"}
+                  ${selectedReport.status === "ongoing" && "bg-orange-100 text-orange-700"}
+                  ${selectedReport.status === "resolved" && "bg-green-100 text-green-700"}
+                `}>
+                  {selectedReport.status.charAt(0).toUpperCase() + selectedReport.status.slice(1)}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Description</p>
+                <p className="bg-gray-50 p-3 rounded-lg text-sm leading-relaxed">
+                  {selectedReport.description}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-md p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-700">
+                    Report Information
+                  </h3>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500 text-xs">Date</p>
+                  <p className="font-semibold text-gray-800">
+                    {selectedReport?.createdAt
+                      ? new Date(selectedReport.createdAt).toLocaleString()
+                      : "N/A"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500 text-xs">Email</p>
+                  <p className="font-semibold">{selectedReport.email}</p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500 text-xs">Resident</p>
+                  <p className="font-semibold">
+                    {selectedReport.residentName?.replace(/\b\w/g, c => c.toUpperCase())}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500 text-xs">Contact</p>
+                  <p className="font-semibold">{selectedReport.contact}</p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500 text-xs">Assigned To</p>
+                  <p className="font-semibold">
+                    {selectedReport.assignedName || "Not assigned"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {selectedReport.status === "reviewing" && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-600">
+                  Send Update to Resident
+                </h3>
+                <textarea
+                  className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Write a message to the resident..."
+                  rows="3"
+                  value={reviewMessage}
+                  onChange={(e) => setReviewMessage(e.target.value)}
+                  disabled={sendingReview}
+                />
+                <div className="flex justify-end">
+                  <button
+                    onClick={sendReview}
+                    disabled={!reviewMessage.trim() || sendingReview}
+                    className={`px-5 py-2 rounded-lg text-sm shadow flex items-center gap-2
+                      ${!reviewMessage.trim() || sendingReview
+                        ? "bg-gray-300 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700 text-white"}
+                    `}
+                  >
+                    {sendingReview && (
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    )}
+                    {sendingReview ? "Sending..." : "Send Update"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {selectedReport.status === "ongoing" && (
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-600">
+                    Ongoing Update
+                  </h3>
+                  <textarea
+                    className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="Write update for the resident..."
+                    rows="3"
+                    value={ongoingMessage}
+                    onChange={(e) => setOngoingMessage(e.target.value)}
+                    disabled={sendingOngoing}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Note: Media upload is only allowed when resolving the report.
+                  </p>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={sendOngoingUpdate}
+                      disabled={!ongoingMessage.trim() || sendingOngoing}
+                      className={`px-5 py-2 rounded-lg text-sm shadow flex items-center gap-2
+                        ${!ongoingMessage.trim() || sendingOngoing
+                          ? "bg-gray-300 cursor-not-allowed"
+                          : "bg-orange-600 hover:bg-orange-700 text-white"}
+                      `}
+                    >
+                      {sendingOngoing && (
+                        <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      )}
+                      {sendingOngoing ? "Sending..." : "Send Update"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 border-t pt-4">
+                  <h3 className="text-sm font-semibold text-gray-600">
+                    Resolve Report (Final Action)
+                  </h3>
+                  <textarea
+                    className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Write resolution message..."
+                    rows="3"
+                    value={resolveMessage}
+                    onChange={(e) => setResolveMessage(e.target.value)}
+                    disabled={resolvingReport}
+                  />
 
 
-  {/* ================= RESOLVE REPORT ================= */}
-  <div className="space-y-3 border-t pt-4">
+                  <div className="flex justify-end">
+                    <button
+                      onClick={resolveReport}
+                      disabled={!resolveMessage.trim() || resolvingReport || uploadingFiles}
+                      className={`px-5 py-2 rounded-lg text-sm shadow flex items-center gap-2
+                        ${!resolveMessage.trim() || resolvingReport || uploadingFiles
+                          ? "bg-gray-300 cursor-not-allowed"
+                          : "bg-green-600 hover:bg-green-700 text-white"}
+                      `}
+                    >
+                      {(resolvingReport || uploadingFiles) && (
+                        <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      )}
+                      {uploadingFiles ? "Uploading Files..." : resolvingReport ? "Resolving..." : "Mark as Resolved"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
-    <h3 className="text-sm font-semibold text-gray-600">
-      Resolve Report (Final Action)
-    </h3>
-
-    <textarea
-      className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-      placeholder="Write resolution message..."
-      rows="3"
-      value={resolveMessage}
-      onChange={(e) => setResolveMessage(e.target.value)}
-    />
-
-    <div>
-      <label className="block text-sm font-medium mb-1">
-        Upload Proof of Action
-      </label>
-
-      <input
-        type="file"
-        multiple
-        accept="image/*,video/*"
-        className="text-sm"
-        onChange={(e) => setFiles([...e.target.files])}
-      />
-    </div>
-
-    <div className="flex justify-end">
-      <button
-        onClick={resolveReport}
-        className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-sm shadow"
-      >
-        Mark as Resolved
-      </button>
-    </div>
-
-  </div>
-
-</div>
-
-)}
-
-</div>
-
-)}
-
-</Modal>
+      <style jsx>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-shake {
+          animation: shake 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-in-out;
+        }
+      `}</style>
     </>
   );
 }

@@ -4,6 +4,7 @@ import Card from "../components/card";
 import { useState, useEffect } from "react";
 import profile from "../assets/profile.png";
 import { uploadToCloudinary } from "../utils/cloudinary";
+import FeedbackModal  from "../components/feedbackmodal";
 
 function Report() {
 
@@ -15,10 +16,12 @@ const [categories, setCategories] = useState([]);
 
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [loading, setLoading] = useState(false);
-
+const [feedbackOpen, setFeedbackOpen] = useState(false);
+const [selectedReport, setSelectedReport] = useState(null);
   const [mediaFiles, setMediaFiles] = useState([]);
   const [submitted, setSubmitted] = useState(false);
 
+  const [reports, setReports] = useState([]);
   /* ---------------- LOCATION ---------------- */
 
   const handleGetLocation = () => {
@@ -172,6 +175,18 @@ if (!location || !description || mediaFiles.length === 0) {
   setLoading(false);
 
 };
+const fetchReports = async () => {
+  const uid = localStorage.getItem("uid");
+
+  const res = await fetch(`https://connecta-backend-u4tw.onrender.com/reports/${uid}`);
+  const data = await res.json();
+
+  setReports(data);
+};
+
+useEffect(() => {
+  fetchReports();
+}, []);
 
   /* ---------------- CLOSE SUCCESS MODAL ---------------- */
 
@@ -310,7 +325,7 @@ const [loadingCategories, setLoadingCategories] = useState(true);
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="Street, City"
-                  className="flex-1 h-11 rounded-lg border border-gray-300 px-4"
+                  className="w-full h-11 rounded-lg border border-gray-300 px-4"
                 />
 
 <button
@@ -344,13 +359,11 @@ const [loadingCategories, setLoadingCategories] = useState(true);
 
             {/* MEDIA CAPTURE */}
 
-            <div className="flex justify-between gap-4">
-
+<div className="flex flex-col gap-3">
               <input
                 type="file"
-                accept="image/*,video/*"
+                accept="image/*"
                 capture="environment"
-                multiple
                 onChange={handleMediaCapture}
                 className="hidden"
                 id="cameraInput"
@@ -358,36 +371,47 @@ const [loadingCategories, setLoadingCategories] = useState(true);
 
               <label
                 htmlFor="cameraInput"
-className="w-full h-20 bg-gray-100 border-2 border-dashed border-[#007CCF] rounded-xl flex items-center justify-center text-3xl text-[#007CCF]"              >
+className="w-full h-20 bg-gray-100 border-2 border-dashed border-[#007CCF] rounded-xl flex items-center justify-center text-3xl text-[#007CCF]"        >
                 +
               </label>
 
 {mediaFiles.length > 0 && (
-  <div className="grid grid-cols-3 gap-2 mt-3">
+  <div className="mt-3 space-y-3">
 
     {mediaFiles.map((file, index) => (
-      <div key={index} className="relative">
+      <div key={index} className="flex items-center gap-3 bg-gray-50 border rounded-lg p-2">
 
+        {/* PREVIEW */}
         {file.type.startsWith("video") ? (
           <video
             src={URL.createObjectURL(file)}
-            className="w-full h-20 object-cover rounded-lg"
+            className="w-16 h-16 object-cover rounded-lg"
           />
         ) : (
           <img
             src={URL.createObjectURL(file)}
-            className="w-full h-20 object-cover rounded-lg"
+            className="w-16 h-16 object-cover rounded-lg"
           />
         )}
+
+        {/* FILE INFO */}
+        <div className="flex-1 min-w-0">
+<p className="text-xs text-gray-700 truncate">
+  {file.name}
+</p>
+          <p className="text-[10px] text-gray-400">
+            {(file.size / 1024).toFixed(1)} KB
+          </p>
+        </div>
 
         {/* REMOVE BUTTON */}
         <button
           onClick={() =>
             setMediaFiles(prev => prev.filter((_, i) => i !== index))
           }
-          className="absolute top-1 right-1 bg-black/70 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+          className="text-red-500 text-xs hover:underline"
         >
-          ✕
+          Remove
         </button>
 
       </div>
@@ -395,7 +419,6 @@ className="w-full h-20 bg-gray-100 border-2 border-dashed border-[#007CCF] round
 
   </div>
 )}
-
             </div>
 
           </div>

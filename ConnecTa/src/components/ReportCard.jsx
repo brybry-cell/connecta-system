@@ -1,4 +1,4 @@
-function ReportCard({ report, onView }) {
+function ReportCard({ report, onView, onFeedback, hasFeedback}) {
 
   const statusColor = {
     pending: "bg-yellow-100 text-yellow-700",
@@ -65,7 +65,14 @@ function ReportCard({ report, onView }) {
         >
           View Report
         </button>
-
+{!hasFeedback && report.status === "resolved" && (
+  <button
+    onClick={onFeedback}
+    className="mt-2 w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
+  >
+    Give Feedback
+  </button>
+)}
       </div>
     </div>
   );
